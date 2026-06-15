@@ -1,0 +1,126 @@
+// Transpilot — Agent 注册与配置
+// 翻译工具链的 Agent 协作配置
+{
+  "version": "1.0",
+  "project": "transpilot",
+  "description": "源码翻译工具链 — Go/C → Rust",
+
+  // 技能注册
+  "skills": {
+    "translator": {
+      "path": ".agents/skills/translator/SKILL.md",
+      "description": "统一翻译驱动器",
+      "triggers": ["translate", "翻译"],
+      "priority": "high"
+    },
+    "go2rust": {
+      "path": ".agents/skills/go2rust/SKILL.md",
+      "description": "Go→Rust 翻译技能",
+      "triggers": ["go to rust", "go2rust"],
+      "dependencies": ["shared"]
+    },
+    "c2rust": {
+      "path": ".agents/skills/c2rust/SKILL.md",
+      "description": "C→Rust 翻译技能",
+      "triggers": ["c to rust", "c2rust"],
+      "dependencies": ["shared"]
+    },
+    "shared": {
+      "path": ".agents/skills/shared/SKILL.md",
+      "description": "共享翻译引擎",
+      "auto_load": true
+    },
+    "parity-checker": {
+      "path": ".agents/skills/parity-checker/SKILL.md",
+      "description": "四层等价性验证器",
+      "triggers": ["check parity", "验证等价性"]
+    },
+    "e2e-debugger": {
+      "path": ".agents/skills/e2e-debugger/SKILL.md",
+      "description": "E2E 失败诊断器",
+      "triggers": ["debug e2e", "诊断"]
+    },
+    "status-dashboard": {
+      "path": ".agents/skills/status-dashboard/SKILL.md",
+      "description": "翻译进度仪表盘",
+      "triggers": ["status", "progress", "进度"]
+    },
+    "self-improving": {
+      "path": ".agents/skills/self-improving/SKILL.md",
+      "description": "自我改进系统",
+      "auto_load": true
+    }
+  },
+
+  // Agent 角色配置
+  "agents": {
+    "translator-agent": {
+      "role": "primary",
+      "description": "主翻译 Agent — 负责执行翻译工作",
+      "skills": ["translator", "go2rust", "c2rust", "shared"],
+      "instructions": [
+        "每次会话开始先恢复状态（读 translation-state.jsonc）",
+        "严格遵循 Wave 模式（3-5 模块/批）",
+        "叶子优先翻译策略",
+        "翻译后立即运行测试验证",
+        "记录所有非平凡决策到 decisions.md"
+      ]
+    },
+    "verifier-agent": {
+      "role": "secondary",
+      "description": "验证 Agent — 负责等价性验证和 E2E",
+      "skills": ["parity-checker", "e2e-debugger", "status-dashboard"],
+      "instructions": [
+        "Wave 完成后自动触发验证",
+        "四层等价性逐层检查",
+        "E2E 失败时自动诊断",
+        "生成详细验证报告"
+      ]
+    },
+    "meta-agent": {
+      "role": "background",
+      "description": "元 Agent — 负责自我改进和经验积累",
+      "skills": ["self-improving"],
+      "instructions": [
+        "监控翻译中的新模式",
+        "遇到新类型映射时更新 type-mapping",
+        "遇到新反模式时更新 anti-patterns",
+        "会话结束时总结经验"
+      ]
+    }
+  },
+
+  // 工作流配置
+  "workflows": {
+    "full-translation": {
+      "description": "完整翻译流程",
+      "steps": [
+        { "agent": "translator-agent", "action": "analyze", "skill": "translator" },
+        { "agent": "translator-agent", "action": "init", "skill": "translator" },
+        { "agent": "translator-agent", "action": "translate-wave", "skill": "translator", "repeat": true },
+        { "agent": "verifier-agent", "action": "verify-wave", "skill": "parity-checker" },
+        { "agent": "verifier-agent", "action": "e2e-test", "skill": "e2e-debugger" },
+        { "agent": "meta-agent", "action": "improve", "skill": "self-improving" }
+      ]
+    },
+    "verify-only": {
+      "description": "仅验证（用于修复后重新验证）",
+      "steps": [
+        { "agent": "verifier-agent", "action": "verify-wave", "skill": "parity-checker" },
+        { "agent": "verifier-agent", "action": "e2e-test", "skill": "e2e-debugger" }
+      ]
+    }
+  },
+
+  // 全局规则
+  "rules": {
+    "state_file": "translation-state.jsonc",
+    "decisions_file": "decisions.md",
+    "max_wave_size": 5,
+    "min_wave_size": 3,
+    "parity_threshold": 95,
+    "unsafe_budget_percent": 5,
+    "e2e_after_first_module": true,
+    "placeholder_max_lifetime_waves": 1
+  }
+}

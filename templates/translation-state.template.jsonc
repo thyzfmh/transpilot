@@ -1,0 +1,70 @@
+// Translation State — [PROJECT_NAME]
+// 翻译进度跟踪文件
+// 由 Transpilot 自动维护，也可手动编辑
+{
+  // 项目元数据
+  "project": {
+    "name": "__PROJECT_NAME__",
+    "source_language": "__SOURCE_LANG__",    // "go" | "c"
+    "source_path": "__SOURCE_PATH__",
+    "target_path": "__TARGET_PATH__",
+    "started_at": "__START_DATE__",
+    "transpilot_version": "1.0"
+  },
+
+  // 全局统计
+  "statistics": {
+    "total_modules": 0,
+    "translated_modules": 0,
+    "verified_modules": 0,
+    "parity_score": 0.0,          // 综合等价性分数
+    "unsafe_ratio": 0.0,           // unsafe 代码占比
+    "test_pass_rate": 0.0,         // 测试通过率
+    "current_wave": 0,
+    "total_waves_planned": 0
+  },
+
+  // 模块状态
+  // 每个模块一个条目，翻译过程中逐步更新
+  "modules": {
+    // 示例:
+    // "module-name": {
+    //   "status": "pending",       // pending | in_progress | translated | verified | blocked
+    //   "difficulty": "medium",    // easy | medium | hard | very_hard
+    //   "wave": null,              // 分配到的 Wave 编号（null = 未分配）
+    //   "parity_score": null,      // 等价性分数（验证后填写）
+    //   "lines_source": 0,         // 源代码行数
+    //   "lines_rust": 0,           // Rust 代码行数
+    //   "tests_total": 0,          // 测试总数
+    //   "tests_passing": 0,        // 通过的测试数
+    //   "unsafe_count": 0,         // unsafe 块数量
+    //   "placeholders": 0,         // todo!/unimplemented! 数量
+    //   "dependencies": [],        // 依赖的其他模块
+    //   "started_at": null,
+    //   "completed_at": null,
+    //   "notes": ""                // 备注
+    // }
+  },
+
+  // Wave 记录
+  "waves": {
+    // 示例:
+    // "1": {
+    //   "status": "complete",      // planned | in_progress | complete | failed
+    //   "modules": ["module-a", "module-b"],
+    //   "started_at": "2024-01-20",
+    //   "completed_at": "2024-01-25",
+    //   "e2e_passed": true
+    // }
+  },
+
+  // 排除列表（不计入 parity 分母的项）
+  "exclusions": [
+    // { "item": "autogen_types.go", "reason": "自动生成的代码", "approved_by": "human" }
+  ],
+
+  // 已知问题
+  "known_issues": [
+    // { "id": "ISS-001", "module": "module-x", "description": "...", "severity": "medium", "status": "open" }
+  ]
+}

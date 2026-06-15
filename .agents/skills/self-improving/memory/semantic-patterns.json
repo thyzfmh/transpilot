@@ -1,0 +1,36 @@
+{
+  "version": "1.0",
+  "description": "翻译模式语义记忆库 — 随翻译进行自动积累",
+  "patterns": [],
+  "statistics": {
+    "total_patterns_discovered": 0,
+    "total_patterns_validated": 0,
+    "last_updated": null,
+    "categories": {
+      "type_mapping": 0,
+      "concurrency": 0,
+      "error_handling": 0,
+      "memory_management": 0,
+      "serialization": 0,
+      "ffi": 0,
+      "unsafe": 0,
+      "other": 0
+    }
+  },
+  "schema": {
+    "pattern": {
+      "id": "string (auto-incremented: PAT-001, PAT-002, ...)",
+      "category": "string (type_mapping|concurrency|error_handling|memory_management|serialization|ffi|unsafe|other)",
+      "source_language": "string (go|c|both)",
+      "title": "string",
+      "source_pattern": "string (code snippet)",
+      "rust_pattern": "string (code snippet)",
+      "applicability": "string (when to use)",
+      "counter_example": "string (when NOT to use)",
+      "discovered_in": "string (module/file where first found)",
+      "discovered_at": "string (ISO datetime)",
+      "confidence": "number (0.0-1.0, increases with usage count)",
+      "usage_count": "number"
+    }
+  }
+}
