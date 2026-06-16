@@ -1,70 +1,49 @@
-// Translation State — [PROJECT_NAME]
-// 翻译进度跟踪文件
-// 由 Transpilot 自动维护，也可手动编辑
+// Translation State — __PROJECT_NAME__
+// 由 Transpilot 维护的翻译进度文件（JSONC 格式）
+// Schema v1.0 — 与 .agents/skills/shared/interfaces.md §4 对齐
 {
-  // 项目元数据
-  "project": {
-    "name": "__PROJECT_NAME__",
-    "source_language": "__SOURCE_LANG__",    // "go" | "c"
-    "source_path": "__SOURCE_PATH__",
-    "target_path": "__TARGET_PATH__",
-    "started_at": "__START_DATE__",
-    "transpilot_version": "1.0"
-  },
+  // === 项目元数据 ===
+  "project": "__PROJECT_NAME__",
+  "src_lang": "__SOURCE_LANG__",
+  "dst_lang": "rust",
+  "source_path": "__SOURCE_PATH__",
+  "target_path": "__TARGET_PATH__",
+  "started_at": "__START_DATE__",
 
-  // 全局统计
-  "statistics": {
-    "total_modules": 0,
-    "translated_modules": 0,
-    "verified_modules": 0,
-    "parity_score": 0.0,          // 综合等价性分数
-    "unsafe_ratio": 0.0,           // unsafe 代码占比
-    "test_pass_rate": 0.0,         // 测试通过率
-    "current_wave": 0,
-    "total_waves_planned": 0
-  },
+  // === 全局进度 ===
+  "overall_parity": 0.0,
+  "current_wave": null,
 
-  // 模块状态
-  // 每个模块一个条目，翻译过程中逐步更新
-  "modules": {
-    // 示例:
-    // "module-name": {
-    //   "status": "pending",       // pending | in_progress | translated | verified | blocked
-    //   "difficulty": "medium",    // easy | medium | hard | very_hard
-    //   "wave": null,              // 分配到的 Wave 编号（null = 未分配）
-    //   "parity_score": null,      // 等价性分数（验证后填写）
-    //   "lines_source": 0,         // 源代码行数
-    //   "lines_rust": 0,           // Rust 代码行数
-    //   "tests_total": 0,          // 测试总数
-    //   "tests_passing": 0,        // 通过的测试数
-    //   "unsafe_count": 0,         // unsafe 块数量
-    //   "placeholders": 0,         // todo!/unimplemented! 数量
-    //   "dependencies": [],        // 依赖的其他模块
-    //   "started_at": null,
-    //   "completed_at": null,
-    //   "notes": ""                // 备注
-    // }
-  },
-
-  // Wave 记录
+  // === 每个 wave 的快照 ===
   "waves": {
-    // 示例:
-    // "1": {
-    //   "status": "complete",      // planned | in_progress | complete | failed
-    //   "modules": ["module-a", "module-b"],
-    //   "started_at": "2024-01-20",
-    //   "completed_at": "2024-01-25",
-    //   "e2e_passed": true
+    // "wave-1": { "status": "done", "parity": 1.0, "halluc_score": 0.05, "diff_verdict": "pass" }
+  },
+
+  // === 模块清单（翻译过程中由 translator 填充）===
+  "modules": {
+    // "module-name": {
+    //   "status": "pending|in_progress|translated|verified|blocked",
+    //   "wave": null,
+    //   "parity": null,
+    //   "src_files": [],
+    //   "dst_files": [],
+    //   "dependencies": [],
+    //   "notes": ""
     // }
   },
 
-  // 排除列表（不计入 parity 分母的项）
-  "exclusions": [
-    // { "item": "autogen_types.go", "reason": "自动生成的代码", "approved_by": "human" }
+  // === 阻断项 ===
+  "blockers": [
+    // { "module": "...", "reason": "...", "since": "wave-N" }
   ],
 
-  // 已知问题
-  "known_issues": [
-    // { "id": "ISS-001", "module": "module-x", "description": "...", "severity": "medium", "status": "open" }
+  // === 排除列表 ===
+  "exclusions": [
+    // { "item": "autogen_types.go", "reason": "auto-generated", "approved_by": "human" }
+  ],
+
+  // === 会话历史 ===
+  "session_history": [
+    // { "wave": "wave-1", "started": "...", "ended": "..." }
   ]
 }

@@ -145,18 +145,28 @@ status-dashboard ← 所有 *.jsonc
 
 ```jsonc
 {
-  "project": "string",
+  "project": "my-project",
   "src_lang": "go|c",
   "dst_lang": "rust",
+  "source_path": "/path/to/source",
+  "target_path": "/path/to/target",
+  "started_at": "2024-01-15",
   "overall_parity": 0.65,
   "current_wave": "wave-3",
   "waves": {
-    "wave-1": { "status": "done", "parity": 1.0, "halluc_score": 0.05 },
-    "wave-2": { "status": "done", "parity": 0.98, "halluc_score": 0.10 },
-    "wave-3": { "status": "in_progress", "parity": null, "halluc_score": null }
+    "wave-1": { "status": "done", "parity": 1.0, "halluc_score": 0.05, "diff_verdict": "pass" },
+    "wave-2": { "status": "done", "parity": 0.98, "halluc_score": 0.10, "diff_verdict": "pass" },
+    "wave-3": { "status": "in_progress", "parity": null, "halluc_score": null, "diff_verdict": null }
+  },
+  "modules": {
+    "module-a": { "status": "verified", "wave": "wave-1", "parity": 1.0, "src_files": [...], "dst_files": [...] },
+    "module-b": { "status": "in_progress", "wave": "wave-3", "parity": null }
   },
   "blockers": [
     { "module": "...", "reason": "...", "since": "wave-2" }
+  ],
+  "exclusions": [
+    { "item": "autogen.go", "reason": "auto-generated", "approved_by": "human" }
   ],
   "session_history": [
     { "wave": "wave-3", "started": "...", "ended": null }
@@ -165,9 +175,11 @@ status-dashboard ← 所有 *.jsonc
 ```
 
 **契约**：
-- 所有 skill 都可读，**只有 translator 可写顶层字段**
+- Schema v1.0 — 与 `templates/translation-state.template.jsonc` 保持同步
+- 所有 skill 都可读，**只有 translator 可写顶层字段和 `modules`**
 - parity-checker 只更新 `waves[].parity`
 - anti-hallucination 只更新 `waves[].halluc_score`
+- differential-tester 只更新 `waves[].diff_verdict`
 - harness 只更新 `current_wave` 和 `session_history`
 
 ---
