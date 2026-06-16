@@ -52,7 +52,7 @@ AI 自己读、自己写"项目记忆"，会话中断后能从断点恢复。
 
 无需人工同步，AI 在每个 Wave 结束时**强制写入**。
 
-### 第三层：升级触发器（必须问人类的 4 种情况）
+### 第三层：升级触发器（必须问人类的 5 种情况）
 其他全部场景，AI **不准**问人类。
 
 | 触发器 | 表现 | 为什么需要人类 |
@@ -61,8 +61,9 @@ AI 自己读、自己写"项目记忆"，会话中断后能从断点恢复。
 | **Parity 反复 < 80%** | 同一模块连续 3 次自修复后 parity 仍低于 80% | 可能源代码本身有 bug 或测试用例错 |
 | **外部依赖缺失** | 需要新增 crate 但选项有 5+ 个/无明显胜出者 | 长期技术债选择 |
 | **源码本身有 bug** | 翻译过程中发现源项目逻辑错误 | 是否同步修复需要业务判断 |
+| **幻觉指数高** | anti-hallucination 连续 3 个 wave 抓出 ≥3 处"无源码引用断言"，或单 wave hallucination_score > 0.3 | AI 出现结构性幻觉倾向，retry 解决不了 |
 
-不在这 4 种内 → AI 自己定，写进 `decisions.md` 备查。
+不在这 5 种内 → AI 自己定，写进 `decisions.md` 备查。
 
 ---
 
@@ -95,17 +96,31 @@ while [ $WAVE -lt $MAX_WAVES ]; do
     --input ".opencode/wave-${WAVE}.jsonc" \
     --max-self-fix 3
 
-  # 3. parity 验证
+  # 3. 索引新鲜度门控（防过期数据导致幻觉）
+  ./scripts/check-codegraph-freshness.sh . 24 || { echo "ESCALATE: stale index"; exit 4; }
+
+  # 4. parity 验证
   agent run --skill parity-checker --task "verify-wave-${WAVE}"
   PARITY=$(jq -r ".waves[\"${WAVE}\"].parity" .opencode/translation-state.jsonc)
 
-  # 4. 升级判断
+  # 5. 幻觉审计（深度核验）
+  agent run --skill anti-hallucination --task "audit-wave-${WAVE}"
+  HSCORE=$(jq -r ".hallucination_score" .opencode/halluc-${WAVE}.jsonc)
+  VERDICT=$(jq -r ".verdict" .opencode/halluc-${WAVE}.jsonc)
+
+  # 6. 占位符门控（零容忍）
+  ./scripts/forbid-placeholders.sh src 0 || { echo "ESCALATE: placeholders left"; exit 5; }
+
+  # 7. 升级判断
   if [ "$PARITY" -lt 80 ] && [ "$RETRY_COUNT" -ge 3 ]; then
     echo "ESCALATE: parity stuck at $PARITY"; exit 2
   fi
+  if [ "$VERDICT" = "escalate" ]; then
+    echo "ESCALATE: hallucination_score=$HSCORE"; exit 6
+  fi
 
-  # 5. 状态持久化
-  git add -A && git commit -m "wave-${WAVE}: parity=${PARITY}"
+  # 8. 状态持久化
+  git add -A && git commit -m "wave-${WAVE}: parity=${PARITY} halluc=${HSCORE}"
 
   # 6. 终止条件
   OVERALL=$(jq -r '.overall_parity' .opencode/translation-state.jsonc)

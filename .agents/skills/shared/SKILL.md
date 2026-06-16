@@ -61,3 +61,4 @@ Before implementing any task:
 - `parity-checker.md` — Four-layer equivalence verification protocol
 - `e2e-validator.md` — E2E validation framework
 - `anti-patterns.md` — Six universal translation anti-patterns
+- `interfaces.md` — Skill 间数据流契约（v1.0）

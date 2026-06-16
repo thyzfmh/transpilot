@@ -1,7 +1,36 @@
-# 从 Taibai 提炼的 8 个关键教训
+# 翻译教训活页本（Lessons Logbook）
 
-> Taibai: Kubernetes v1.36 (Go) → Rust 翻译项目
-> 规模: 数十万行代码, 2459+ 测试, 99.5% parity 目标
+> **本文件是活页本，不是定稿**。每翻一个 Wave、每踩一个坑，都应在末尾追加一条。
+> 起源：Taibai (Kubernetes v1.36 Go → Rust)，已沉淀 8 条；后续项目继续累积。
+
+---
+
+## 如何追加新教训
+
+每条教训采用统一格式：
+
+```markdown
+## L<编号>: <一句话标题>
+
+**Source**: <来自哪个项目/Wave>
+**Category**: <DI | Concurrency | Constants | API | Testing | Architecture | Workflow | Other>
+**Severity**: <high | medium | low>
+
+**背景**: 是什么场景下踩到的
+**教训**: 学到了什么
+**规则**: 提炼成可执行的一句话约束
+**关联**: <相关 skill / anti-hallucination 类型，如有>
+```
+
+铁律：
+- **只追加，不删改** 历史条目（追加修订时新开 L<n>-revisited）
+- **编号永不复用**
+- 每条 ≤30 行；超过则拆 reference 或独立文档
+- 按 Category 可在文末加索引
+
+---
+
+## 当前 8 条（来自 Taibai）
 
 ---
 
@@ -129,3 +158,18 @@
 | L006 | 数据不兼容 | 低（写 roundtrip 测试）|
 | L007 | 重复劳动 | 低（维护状态文件）|
 | L008 | 行为不等价 | 中（测试优先翻译策略）|
+
+
+---
+
+## 分类索引
+
+| Category | Lessons |
+|----------|---------|
+| DI | L001 |
+| Concurrency | L003 |
+| Testing | L002, L008 |
+| Architecture | L004, L005 |
+| Workflow | L006, L007 |
+
+> 新增条目时同步更新本表。

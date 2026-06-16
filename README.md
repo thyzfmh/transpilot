@@ -7,10 +7,56 @@
 - **Go→Rust 翻译** — 类型映射、并发模式、错误处理、序列化兼容
 - **C→Rust 翻译** — 内存安全、指针消除、预处理器映射、FFI 互操作、unsafe 审计
 - **四层等价性验证** — 结构/功能/接口/行为 四层验证确保翻译正确性
+- **幻觉防御网** — anti-hallucination skill + 5 问检查清单 + 索引新鲜度校验
 - **Wave 模式翻译** — 分批翻译，每批 3-5 模块，逐步推进
 - **自我改进系统** — 从翻译经验中自动积累模式
 - **E2E 诊断器** — 自动定位翻译引入的行为差异
 - **进度仪表盘** — 实时跟踪翻译进展
+
+## 全局架构
+
+```mermaid
+graph TB
+    Human[人类 T0启动 / T1升级 / T2验收]
+    OpenSpec[OpenSpec propose/apply/archive]
+    Harness[Harness run-autonomous.sh]
+    State[(translation-state.jsonc + decisions.md)]
+
+    CG[CodeGraph 索引]
+    Fresh[check-codegraph-freshness.sh]
+
+    Translator[translator]
+    Navigator[codegraph-navigator]
+    AntiHalluc[anti-hallucination]
+    Parity[parity-checker]
+    E2E[e2e-debugger]
+    SI[self-improving]
+    Dash[status-dashboard]
+
+    Forbid[forbid-placeholders.sh]
+
+    Human --> OpenSpec
+    OpenSpec --> Harness
+    Harness --> Fresh
+    Fresh --> CG
+    Harness --> Translator
+    Translator --> Navigator
+    Navigator --> CG
+    Translator --> AntiHalluc
+    AntiHalluc --> Parity
+    Parity --> E2E
+    Translator --> Forbid
+    Forbid --> Harness
+    AntiHalluc --> Harness
+    Parity --> Harness
+    Harness --> State
+    SI -.读取.-> State
+    SI -.读取.-> AntiHalluc
+    Dash -.读取.-> State
+    Harness -->|升级| Human
+```
+
+Skill 间数据流契约见 [.agents/skills/shared/interfaces.md](.agents/skills/shared/interfaces.md)。
 
 ## 从 Taibai 提炼
 
