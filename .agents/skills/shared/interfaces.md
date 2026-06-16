@@ -8,9 +8,11 @@
 ## 总览：数据流
 
 ```
-translator → [wave-N.jsonc]         → parity-checker
-parity-checker → [parity-N.jsonc]   → anti-hallucination
-anti-hallucination → [halluc-N.jsonc] → harness 升级判断
+translator → [wave-N.jsonc]            → parity-checker
+parity-checker → [parity-N.jsonc]      → anti-hallucination
+anti-hallucination → [halluc-N.jsonc]  → differential-tester
+differential-tester → [diff-N.jsonc]   → harness 升级判断
+acceptance-plan.yaml (T0 锁定)          → harness / parity-checker / differential-tester
 self-improving ← 所有 skill 的输出
 status-dashboard ← 所有 *.jsonc
 ```
@@ -107,6 +109,33 @@ status-dashboard ← 所有 *.jsonc
   - `retry` → 同 wave 自我修复（≤3 次）
   - `escalate` → 升级人类
 - `type` 必须是 5 个枚举之一（与 reference.md 5 类幻觉对齐）
+
+---
+
+## 3.5 differential-tester → harness
+
+**文件**：`.opencode/diff-${N}.jsonc`
+
+```jsonc
+{
+  "wave_id": "wave-3",
+  "oracle_mode": "run-source|record-replay|static-codegraph|dual-ai",
+  "cases_total": 142,
+  "cases_passed": 138,
+  "cases_failed": [
+    { "case_id": "AC-bar-001", "input": "...", "src_out": "...", "dst_out": "...", "diff": "..." }
+  ],
+  "ai_derived_oracles": 0,
+  "parity_ceiling": 0.95,
+  "verdict": "pass|retry|escalate"
+}
+```
+
+**契约**：
+- `ai_derived_oracles` 必须为 0；> 0 → harness 强制 escalate
+- `oracle_mode` 影响 `parity_ceiling`：run-source 0.99 / record-replay 0.95 / dual-ai 0.85 / static-codegraph 0.75
+- `verdict` 语义与 halluc-N.jsonc 相同
+- 写入方：differential-tester；读取方：harness / status-dashboard
 
 ---
 

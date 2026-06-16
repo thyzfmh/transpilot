@@ -1,0 +1,83 @@
+# acceptance-plan.yaml — T0 验收方案（用户必填，AI 仅生成模板）
+#
+# 用法：transpilot init 生成此文件，用户审核每一行后提交。
+# 之后每个 wave 结束都会用本文件做对照。
+
+# ============ 1. 范围 ============
+scope:
+  source_project: ../path/to/source           # 源项目根
+  target_project: ./                          # 译码项目根
+  in:                                         # 翻译范围（白名单）
+    - "<dir1>"
+    - "<dir2>"
+  out:                                        # 排除（legacy/三方/生成代码）
+    - "vendor/**"
+    - "**/*_generated.go"
+
+# ============ 2. Oracle 策略（关键！决定 parity 天花板）============
+verification:
+  # 主 Oracle：源项目能跑吗？
+  oracle_primary: run-source                  # run-source | record-replay | static-codegraph | dual-ai
+  oracle_fallback: static-codegraph           # 主 Oracle 失败时降级
+
+  # 一票否决
+  forbidden:
+    - ai-derived-expected-values              # AI 自己写预期值
+    - hardcoded-string-literals-in-assert     # 字符串字面量 expected
+
+  # 源项目状态自报（用户必填，影响 parity 上限）
+  source_runnable: true                       # 源项目能 build & run？
+  source_test_coverage_pct: 30                # 估算（0=没测试, 90+=完善）
+
+# ============ 3. 验收维度 + 加权 ============
+dimensions:
+  api_compat:    { weight: 0.30, target: 1.00 }   # 接口 100% 兼容
+  behavior:      { weight: 0.40, target: 0.95 }   # 行为对齐（依赖 Oracle）
+  perf:          { weight: 0.10, target: 0.80 }   # 性能不低于源 80%
+  test_coverage: { weight: 0.10, target: 0.60 }   # 单测覆盖
+  e2e_smoke:     { weight: 0.10, target: 1.00 }   # E2E 冒烟全过
+
+# ============ 4. 硬性禁止项（一票否决）============
+forbidden:
+  unwrap_in_production: true                  # 禁止 .unwrap()
+  todo_macros_left: 0                         # 禁止 todo!()/unimplemented!()
+  hallucination_score_max: 0.10               # halluc-N.jsonc 上限
+  ai_derived_oracles_max: 0                   # diff-N.jsonc 必须 0
+
+# ============ 5. 验收用例（按优先级）============
+cases:
+  - id: AC-001
+    type: smoke
+    must_pass: true
+    desc: "<描述：最小可运行路径>"
+    adapter: cli-tool                         # cli-tool|http-service|library|daemon|batch-job|distributed
+    setup: { }
+    actions: [ ]
+    assert:  [ ]
+
+  - id: AC-002
+    type: behavior
+    must_pass: true
+    desc: "<描述：核心功能 1>"
+    adapter: <see above>
+
+  - id: AC-003
+    type: perf
+    must_pass: false                          # 软目标
+    desc: "<描述：性能基线>"
+
+# ============ 6. 升级条件（自动判定何时需人类决策）============
+escalate_to_human:
+  - any_must_pass_failed
+  - overall_score_below: 0.85
+  - hallucination_score_above: 0.20
+  - ai_derived_oracles_above: 0
+  - consecutive_waves_regress: 2
+
+# ============ 7. parity 天花板自检（基于 Oracle）============
+# 根据 oracle_primary 自动计算上限，写报告时对比：
+#   run-source       → 95-99%
+#   record-replay    → 90-95%
+#   dual-ai          → 75-85%
+#   static-codegraph → 60-75%
+# 若声明目标 > 天花板 → init 阶段警告用户。

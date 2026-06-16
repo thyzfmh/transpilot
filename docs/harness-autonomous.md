@@ -52,7 +52,7 @@ AI 自己读、自己写"项目记忆"，会话中断后能从断点恢复。
 
 无需人工同步，AI 在每个 Wave 结束时**强制写入**。
 
-### 第三层：升级触发器（必须问人类的 5 种情况）
+### 第三层：升级触发器（必须问人类的 6 种情况）
 其他全部场景，AI **不准**问人类。
 
 | 触发器 | 表现 | 为什么需要人类 |
@@ -62,6 +62,7 @@ AI 自己读、自己写"项目记忆"，会话中断后能从断点恢复。
 | **外部依赖缺失** | 需要新增 crate 但选项有 5+ 个/无明显胜出者 | 长期技术债选择 |
 | **源码本身有 bug** | 翻译过程中发现源项目逻辑错误 | 是否同步修复需要业务判断 |
 | **幻觉指数高** | anti-hallucination 连续 3 个 wave 抓出 ≥3 处"无源码引用断言"，或单 wave hallucination_score > 0.3 | AI 出现结构性幻觉倾向，retry 解决不了 |
+| **Oracle 污染** | `ai_derived_oracles > 0`，或 `check-oracle-independence.sh` 抓出硬编码字面量预期值 | AI 在自己批改作业，必须重定 Oracle 策略或降低 parity 上限 |
 
 不在这 5 种内 → AI 自己定，写进 `decisions.md` 备查。
 
@@ -110,6 +111,14 @@ while [ $WAVE -lt $MAX_WAVES ]; do
 
   # 6. 占位符门控（零容忍）
   ./scripts/forbid-placeholders.sh src 0 || { echo "ESCALATE: placeholders left"; exit 5; }
+
+  # 6.5. Oracle 独立性门控（禁止 AI 自批改作业）
+  ./scripts/check-oracle-independence.sh tests || { echo "ESCALATE: AI-derived oracle"; exit 7; }
+
+  # 6.6. 差分测试（用源项目当 Oracle 验证行为对齐）
+  agent run --skill differential-tester --task "diff-wave-${WAVE}"
+  AI_ORACLES=$(jq -r ".ai_derived_oracles" .opencode/diff-${WAVE}.jsonc)
+  [ "$AI_ORACLES" -eq 0 ] || { echo "ESCALATE: ai_derived_oracles=$AI_ORACLES"; exit 7; }
 
   # 7. 升级判断
   if [ "$PARITY" -lt 80 ] && [ "$RETRY_COUNT" -ge 3 ]; then

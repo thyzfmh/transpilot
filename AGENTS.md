@@ -33,6 +33,8 @@ Born from Taibai (Rust reimplementation of Kubernetes v1.36), generalizing 30+ t
 10. Zero placeholders at wave end — `scripts/forbid-placeholders.sh` must pass
 11. Evidence-based translation — no assertion without `codegraph_node` citation; every non-trivial function passes anti-hallucination 5-questions
 12. Fresh index — `scripts/check-codegraph-freshness.sh` runs before each wave
+13. **Oracle independence** — expected values come from `src_run()`, fixtures, or static codegraph; never from AI. Enforced by `scripts/check-oracle-independence.sh`
+14. **T0 acceptance plan** — every project starts with `acceptance-plan.yaml` (template at `templates/acceptance-plan.yaml.template`), user-confirmed before wave-1
 
 ## Skill Usage
 
@@ -43,12 +45,21 @@ Born from Taibai (Rust reimplementation of Kubernetes v1.36), generalizing 30+ t
 | Verify parity | `/parity-checker <component> [module]` |
 | Run E2E validation | `/e2e-validator <component>` |
 | Diagnose E2E failures | `/e2e-debugger <component>` |
+| Diff-test behavior (Oracle = source project) | `/differential-tester <wave>` |
 | Check progress | `/status [component]` |
 | Check index freshness | `./scripts/check-codegraph-freshness.sh` |
 | Check placeholders | `./scripts/forbid-placeholders.sh src` |
+| Check Oracle independence | `./scripts/check-oracle-independence.sh tests` |
 
 ## Cross-Skill Contract
 
 All skills exchange data via `.opencode/*.jsonc` files — schema locked in
 `.agents/skills/shared/interfaces.md` (v1.0). Schema changes require OpenSpec
 proposal.
+
+Key data flows:
+- `wave-N.jsonc` (translator) → `parity-N.jsonc` (parity-checker)
+  → `halluc-N.jsonc` (anti-hallucination) → `diff-N.jsonc` (differential-tester)
+  → `translation-state.jsonc` (harness, single source of truth)
+- `acceptance-plan.yaml` is read-only after T0 confirmation — only OpenSpec
+  proposal can amend it.

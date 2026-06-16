@@ -1,8 +1,8 @@
 # 翻译核验清单（函数级强制）
 
-> 每个**非平凡函数**翻译前必答 5 问。叶子工具函数（无外部调用、纯计算）可跳过。
+> 每个**非平凡函数**翻译前必答 6 问。叶子工具函数（无外部调用、纯计算）可跳过。
 
-## 5 问
+## 6 问
 
 ### Q1. 源码证据
 > 我刚才描述的源码行为，能贴出 `codegraph_node` 返回的原始片段吗？带行号？
@@ -38,6 +38,18 @@
 - [ ] 想到了 → 写成测试用例
 - [ ] 想不到 → **警告**，覆盖可能不够，标记 `coverage:thin`
 
+### Q6. Oracle 独立性
+> 我准备写的测试，预期值（expected）从哪里来？
+
+- [ ] 来自 `src_run(input)`（源项目实际跑出来） ✓
+- [ ] 来自源代码静态特征（codegraph 节点/调用图/常量） ✓
+- [ ] 来自另一个 AI（与我隔离 context） ✓
+- [ ] 来自 property/metamorphic 性质（性质来自源码注释/文档） ✓
+- [ ] **我自己想的字符串/数字字面量** ✗ → **停**，重写
+- [ ] 没写测试（仅签名翻译） → 标记 `oracle: none`，由 differential-tester 兜底
+
+> **铁律**：Oracle 必须独立于被测代码。AI 写代码 + AI 写预期 = 无效自验证。
+
 ---
 
 ## 输出（写到 wave 报告）
@@ -50,7 +62,8 @@
     "q2_api_evidence": "docs.rs/tokio/1.x/sync/struct.Mutex.html#method.try_lock",
     "q3_constant_evidence": ["TIMEOUT=30s (bar.go:51)", "MAX_RETRY=3 (bar.go:53)"],
     "q4_callers_match": { "src": 7, "dst": 7 },
-    "q5_counterexample": "concurrent close+send → both panic"
+    "q5_counterexample": "concurrent close+send → both panic",
+    "q6_oracle_source": "src_run|static-codegraph|dual-ai|property|none"
   }
 }
 ```
