@@ -18,7 +18,8 @@
 #   load_fixture / replay_fixture            → 已录回放
 #   // oracle:ok                             → 手动标记白名单
 
-set -euo pipefail
+set -uo pipefail
+# NOTE: 不用 set -e，因为 python 返回 1 表示"有违规"而非脚本错误
 
 TESTS_DIR="${1:-tests}"
 STRICT="${2:-}"
@@ -29,14 +30,15 @@ if [ ! -d "$TESTS_DIR" ]; then
   exit 2
 fi
 
-# 使用 python 做更精准的多行感知检测
-VIOLATIONS=$(python3 << 'PYEOF'
+# 使用 python3 做多行感知检测，通过环境变量传递 tests_dir
+export ORACLE_CHECK_DIR="$TESTS_DIR"
+VIOLATIONS=$(python3 - << 'PYEOF'
 import os, re, sys
 
-tests_dir = sys.argv[1] if len(sys.argv) > 1 else "tests"
+tests_dir = os.environ.get("ORACLE_CHECK_DIR", "tests")
 violations = []
 
-# Whitelist patterns (any of these in the same assert → skip)
+# Whitelist patterns (any of these in the same assert context → skip)
 WHITELIST = [
     r'src_run',
     r'dst_run',
@@ -72,18 +74,16 @@ for root, dirs, files in os.walk(tests_dir):
             if not re.search(r'(assert_eq!|prop_assert_eq!|assert!)', line):
                 continue
 
-            # Check whitelist
-            whitelisted = False
-            # Look at context: current line + 2 lines before/after for multiline
-            context_start = max(0, i-3)
-            context_end = min(len(lines), i+2)
+            # Check whitelist — look at context (2 lines before/after) for multiline
+            context_start = max(0, i - 3)
+            context_end = min(len(lines), i + 2)
             context = '\n'.join(lines[context_start:context_end])
 
+            whitelisted = False
             for wp in WHITELIST:
                 if re.search(wp, context):
                     whitelisted = True
                     break
-
             if whitelisted:
                 continue
 
@@ -92,7 +92,6 @@ for root, dirs, files in os.walk(tests_dir):
                 continue
 
             # Check for UPPER_CASE constant as expected value (fixture)
-            # Pattern: assert_eq!(CONST, ...) or assert_eq!(..., CONST)
             assert_match = re.search(r'assert_eq!\s*\(([^)]+)\)', line)
             if assert_match:
                 args = assert_match.group(1)
@@ -117,8 +116,7 @@ if violations:
 else:
     sys.exit(0)
 PYEOF
-"$TESTS_DIR")
-
+)
 EXIT_CODE=$?
 
 if [ $EXIT_CODE -eq 1 ]; then
@@ -136,7 +134,7 @@ if [ $EXIT_CODE -eq 1 ]; then
   echo "See: .agents/skills/differential-tester/reference.md"
   exit 1
 elif [ $EXIT_CODE -ne 0 ]; then
-  echo "[oracle-independence] ERROR: script failed" >&2
+  echo "[oracle-independence] ERROR: python script failed (exit=$EXIT_CODE)" >&2
   exit 2
 fi
 

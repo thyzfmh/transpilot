@@ -187,17 +187,26 @@ Agent 会从 `translation-state.jsonc` 读取进度，自动开始 Wave 2。
 所有 Wave 完成后：
 
 ```bash
-# 查看进度仪表盘
-./scripts/parity-report.sh /path/to/myapp-rs
+# 查看进度仪表盘（在翻译项目根目录执行）
+./scripts/parity-report.sh summary     # 总览
+./scripts/parity-report.sh full        # 总览 + 风险评估
+./scripts/parity-report.sh module foo  # 单模块详情
+./scripts/parity-report.sh wave 3      # 单 wave 详情
 ```
 
 **输出示例:**
 ```
-组件 myapp:  ████████████ 100% (5/5 waves)
-- 模块翻译: 23/23 ✓
-- 测试通过: 156/156 ✓
-- Parity 分数: 96.8%
-- E2E: 全部通过 ✓
+=== Transpilot Progress Report ===
+Project: myapp
+Language: go → rust
+Current Wave: wave-5
+Overall Parity: 96.8%
+Modules: 23 total
+  Verified:    23 (100.0%)
+  Translated:  0
+  In Progress: 0
+  Pending:     0
+  Blocked:     0
 - 占位符 (todo!): 0 ✓
 - unsafe 比例: 1.2% (预算 5%)
 

@@ -70,74 +70,32 @@ AI 自己读、自己写"项目记忆"，会话中断后能从断点恢复。
 
 ## 3. 自驱脚本：harness/run-autonomous.sh
 
-把三层闭环串成一个可循环的脚本。
+把三层闭环串成一个可循环的脚本。**完整实现在 `harness/run-autonomous.sh`**。
 
 ```bash
-#!/usr/bin/env bash
-# harness/run-autonomous.sh
-# 用法: ./harness/run-autonomous.sh <target-parity> <max-waves>
-# 例:  ./harness/run-autonomous.sh 95 20
-
-set -euo pipefail
-TARGET=${1:-95}
-MAX_WAVES=${2:-20}
-WAVE=0
-
-while [ $WAVE -lt $MAX_WAVES ]; do
-  WAVE=$((WAVE+1))
-  echo "=== Wave $WAVE ==="
-
-  # 1. 让 AI 选择下一个 Wave 范围（基于 codegraph 依赖图）
-  agent run --skill translator --task "select-next-wave" \
-    --input ".opencode/translation-state.jsonc" \
-    --output ".opencode/wave-${WAVE}.jsonc"
-
-  # 2. 让 AI 执行翻译
-  agent run --skill translator --task "execute-wave" \
-    --input ".opencode/wave-${WAVE}.jsonc" \
-    --max-self-fix 3
-
-  # 3. 索引新鲜度门控（防过期数据导致幻觉）
-  ./scripts/check-codegraph-freshness.sh . 24 || { echo "ESCALATE: stale index"; exit 4; }
-
-  # 4. parity 验证
-  agent run --skill parity-checker --task "verify-wave-${WAVE}"
-  PARITY=$(jq -r ".waves[\"${WAVE}\"].parity" .opencode/translation-state.jsonc)
-
-  # 5. 幻觉审计（深度核验）
-  agent run --skill anti-hallucination --task "audit-wave-${WAVE}"
-  HSCORE=$(jq -r ".hallucination_score" .opencode/halluc-${WAVE}.jsonc)
-  VERDICT=$(jq -r ".verdict" .opencode/halluc-${WAVE}.jsonc)
-
-  # 6. 占位符门控（零容忍）
-  ./scripts/forbid-placeholders.sh src 0 || { echo "ESCALATE: placeholders left"; exit 5; }
-
-  # 6.5. Oracle 独立性门控（禁止 AI 自批改作业）
-  ./scripts/check-oracle-independence.sh tests || { echo "ESCALATE: AI-derived oracle"; exit 7; }
-
-  # 6.6. 差分测试（用源项目当 Oracle 验证行为对齐）
-  agent run --skill differential-tester --task "diff-wave-${WAVE}"
-  AI_ORACLES=$(jq -r ".ai_derived_oracles" .opencode/diff-${WAVE}.jsonc)
-  [ "$AI_ORACLES" -eq 0 ] || { echo "ESCALATE: ai_derived_oracles=$AI_ORACLES"; exit 7; }
-
-  # 7. 升级判断
-  if [ "$PARITY" -lt 80 ] && [ "$RETRY_COUNT" -ge 3 ]; then
-    echo "ESCALATE: parity stuck at $PARITY"; exit 2
-  fi
-  if [ "$VERDICT" = "escalate" ]; then
-    echo "ESCALATE: hallucination_score=$HSCORE"; exit 6
-  fi
-
-  # 8. 状态持久化
-  git add -A && git commit -m "wave-${WAVE}: parity=${PARITY} halluc=${HSCORE}"
-
-  # 6. 终止条件
-  OVERALL=$(jq -r '.overall_parity' .opencode/translation-state.jsonc)
-  [ "$OVERALL" -ge "$TARGET" ] && { echo "DONE"; exit 0; }
-done
-
-echo "ESCALATE: max waves reached"; exit 3
+# 用法
+./harness/run-autonomous.sh <target-parity> <max-waves>
+# 例: 目标 95% parity，最多 20 个 wave
+./harness/run-autonomous.sh 95 20
 ```
+
+每个 Wave 的执行流程（8 步 + 2 道 Oracle 门）：
+
+1. **选范围** — translator skill 基于 codegraph 选 3-5 个叶子模块
+2. **翻译** — translator 执行翻译，最多 3 次自修复
+3. **索引新鲜度** — `check-codegraph-freshness.sh`（≤24h）
+4. **Parity 验证** — parity-checker 对比源/译码
+5. **幻觉审计** — anti-hallucination 6 问清单
+6. **占位符门控** — `forbid-placeholders.sh`（零容忍）
+7. **Oracle 独立性** — `check-oracle-independence.sh`（禁止 AI 自写预期值）
+8. **差分测试** — differential-tester 用 src_run() 做 Oracle
+9. **升级判断** — 6 种触发器任一命中 → 退出等人类
+10. **状态持久化** — git commit + 更新 translation-state.jsonc
+
+终止条件：`overall_parity >= target` 或 `wave >= max_waves`。
+
+> 具体代码见 [`harness/run-autonomous.sh`](../harness/run-autonomous.sh)。
+> 不依赖 `jq`，使用 python3 解析 JSONC。
 
 **退出码语义**（让上层 CI/cron 能判断）：
 - `0`：达成目标，等人类验收

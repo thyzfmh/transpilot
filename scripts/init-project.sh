@@ -103,6 +103,12 @@ for SCRIPT in "$TRANSPILOT_ROOT/scripts/"*.sh; do
     fi
 done
 
+# === 链接 harness ===
+mkdir -p harness
+if [ -f "$TRANSPILOT_ROOT/harness/run-autonomous.sh" ]; then
+    ln -sfn "$TRANSPILOT_ROOT/harness/run-autonomous.sh" "harness/run-autonomous.sh"
+fi
+
 # === 生成完整 AGENTS.md ===
 cat > AGENTS.md << AGENTSEOF
 # $PROJECT_NAME — Transpilot Translation Project
