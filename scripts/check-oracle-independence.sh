@@ -64,51 +64,86 @@ for root, dirs, files in os.walk(tests_dir):
             content = f.read()
         lines = content.split('\n')
 
-        for i, line in enumerate(lines, 1):
+        # Build "logical assertion blocks" — concatenate continuation lines
+        # until the assert!/assert_eq! call's parentheses are balanced.
+        i = 0
+        while i < len(lines):
+            line = lines[i]
             stripped = line.lstrip()
-            # Skip comment lines
+            line_num = i + 1
+
             if stripped.startswith('//'):
+                i += 1
                 continue
 
-            # Detect assert_eq! / prop_assert_eq! / assert!
-            if not re.search(r'(assert_eq!|prop_assert_eq!|assert!)', line):
+            m = re.search(r'(assert_eq!|prop_assert_eq!|assert!|assert_ne!)', line)
+            if not m:
+                i += 1
                 continue
 
-            # Check whitelist — look at context (2 lines before/after) for multiline
-            context_start = max(0, i - 3)
-            context_end = min(len(lines), i + 2)
-            context = '\n'.join(lines[context_start:context_end])
+            # Accumulate full assertion across lines (paren balance)
+            block_lines = [line]
+            block_start = i
+            text = line[m.start():]
+            depth = 0
+            seen_open = False
+            for ch in text:
+                if ch == '(':
+                    depth += 1; seen_open = True
+                elif ch == ')':
+                    depth -= 1
+            j = i
+            while seen_open and depth > 0 and j + 1 < len(lines):
+                j += 1
+                nxt = lines[j]
+                block_lines.append(nxt)
+                for ch in nxt:
+                    if ch == '(': depth += 1
+                    elif ch == ')': depth -= 1
+            block = '\n'.join(block_lines)
 
-            whitelisted = False
-            for wp in WHITELIST:
-                if re.search(wp, context):
-                    whitelisted = True
-                    break
-            if whitelisted:
+            # Check whitelist on the full block + 2 lines before
+            ctx_start = max(0, block_start - 2)
+            context = '\n'.join(lines[ctx_start:j + 1])
+            if any(re.search(wp, context) for wp in WHITELIST):
+                i = j + 1
                 continue
 
-            # Check for type-only assertions (is_ok, is_err, etc.)
-            if re.search(r'\.is_(ok|err|some|none|empty)\(\)', line):
+            # Type-only assertions
+            if re.search(r'\.is_(ok|err|some|none|empty)\(\)', block):
+                i = j + 1
                 continue
 
-            # Check for UPPER_CASE constant as expected value (fixture)
-            assert_match = re.search(r'assert_eq!\s*\(([^)]+)\)', line)
-            if assert_match:
-                args = assert_match.group(1)
-                parts = args.split(',')
+            # UPPER_CASE constant on either side of assert_eq!
+            am = re.search(r'(assert_eq!|assert_ne!|prop_assert_eq!)\s*\((.*)\)\s*;?\s*$', block, re.DOTALL)
+            if am:
+                args = am.group(2)
+                # Split top-level by comma (depth 0)
+                parts, depth_, buf = [], 0, ''
+                for ch in args:
+                    if ch == '(' or ch == '[' or ch == '{': depth_ += 1
+                    elif ch == ')' or ch == ']' or ch == '}': depth_ -= 1
+                    if ch == ',' and depth_ == 0:
+                        parts.append(buf); buf = ''
+                    else:
+                        buf += ch
+                if buf: parts.append(buf)
                 if len(parts) >= 2:
                     left = parts[0].strip()
-                    right = ','.join(parts[1:]).strip().rstrip(')')
+                    right = parts[1].strip()
                     if CONST_PAT.match(left) or CONST_PAT.match(right):
+                        i = j + 1
                         continue
 
-            # Now check for hardcoded literal values
-            has_string_literal = re.search(r'"[^"]{1,}"', line)
-            has_num_literal = re.search(r',\s*-?[0-9]+\.?[0-9]*\s*[,)]', line)
-            has_contains = re.search(r'\.contains\s*\(\s*"', line)
+            # Hardcoded literals (across the whole block)
+            has_string_literal = re.search(r'"[^"\\]{1,}"', block)
+            has_num_literal = re.search(r',\s*-?[0-9]+\.?[0-9]*\s*[,)]', block)
+            has_contains = re.search(r'\.contains\s*\(\s*"', block)
 
             if has_string_literal or has_num_literal or has_contains:
-                violations.append(f"{fpath}:{i}: {line.strip()}")
+                violations.append(f"{fpath}:{line_num}: {block_lines[0].strip()}")
+
+            i = j + 1
 
 if violations:
     print('\n'.join(violations))

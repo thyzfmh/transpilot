@@ -127,7 +127,7 @@ codegraph_callers --node "crates::foo::Bar" → 必须也是 N 个（允许 -2 ~
 本 skill 在 wave 结束时输出一份审计报告：
 
 ```jsonc
-// .opencode/anti-halluc-wave-N.jsonc
+// .opencode/halluc-${N}.jsonc
 {
   "wave": "N",
   "audited_modules": ["mod1", "mod2"],

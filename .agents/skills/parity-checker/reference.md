@@ -137,8 +137,10 @@ for module in $WAVE_MODULES; do
     check_parity $module || FAILED+=($module)
 done
 
-# E2E 验证
-./scripts/e2e-test.sh
+# E2E 验证（用户项目自带，按 acceptance-plan.yaml 中 e2e_command 调用）
+# 例如：cargo test --test e2e   或   pytest tests/e2e/
+# 该脚本不由 transpilot 提供，由翻译目标项目维护
+bash -c "$(grep -A1 '^e2e_command:' .opencode/acceptance-plan.yaml | tail -1 | sed 's/^[[:space:]]*//')"
 
 # 生成 Wave 报告
 ./scripts/wave-report.sh $WAVE_ID

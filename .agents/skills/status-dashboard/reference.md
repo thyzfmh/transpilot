@@ -157,19 +157,19 @@ Rust 行: 2,450 (+17%)
 
 ```bash
 # 概览
-./scripts/progress-report.sh summary
+./scripts/parity-report.sh summary
 
 # Wave 详情
-./scripts/progress-report.sh wave 3
+./scripts/parity-report.sh wave 3
 
 # 模块详情
-./scripts/progress-report.sh module module-c
+./scripts/parity-report.sh module module-c
 
 # 风险评估
-./scripts/progress-report.sh risk
+./scripts/parity-report.sh risk
 
 # 完整报告（含所有内容）
-./scripts/progress-report.sh full > report.md
+./scripts/parity-report.sh full > report.md
 ```
 
 ## 告警规则
