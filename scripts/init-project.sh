@@ -96,9 +96,10 @@ done
 
 # === 链接脚本 ===
 mkdir -p scripts
-for SCRIPT in "$TRANSPILOT_ROOT/scripts/"*.sh; do
-    BASENAME=$(basename "$SCRIPT")
-    if [ "$BASENAME" != "init-project.sh" ]; then
+for SCRIPT in "$TRANSPILOT_ROOT/scripts/"*; do
+    [ -f "$SCRIPT" ] || continue
+    BASENAME="$(basename "$SCRIPT")"
+    if [ "$BASENAME" != "init-project.sh" ] && [[ "$BASENAME" == *.sh || "$BASENAME" == "transpilot" ]]; then
         ln -sfn "$SCRIPT" "scripts/$BASENAME"
     fi
 done
@@ -133,16 +134,21 @@ cat > AGENTS.md << AGENTSEOF
 12. Fresh index — \`scripts/check-codegraph-freshness.sh\` runs before each wave
 13. Oracle independence — expected values from src_run()/fixtures/codegraph only; never AI-derived. Enforced by \`scripts/check-oracle-independence.sh\`
 14. T0 acceptance plan — acceptance-plan.yaml must be user-confirmed before wave-1
+15. Analyze sync before Wave 1 — after project analysis, summarize findings to the user and ask scope/Oracle/E2E questions before planning the first Wave
 
 ## Skill Usage
 | I want to... | Run |
 |---|---|
-| Start/continue translating | \`/translator $SOURCE_LANG $PROJECT_NAME\` |
+| Review acceptance gate | \`./scripts/transpilot acceptance review\` |
+| Confirm acceptance gate | \`./scripts/transpilot acceptance confirm\` |
+| Start/continue translating | \`./scripts/transpilot run --dry-run\` then follow the OpenCode handoff |
+| Check progress | \`./scripts/transpilot status\` |
+| Expert progress | \`./scripts/transpilot status --expert\` |
+| Diagnose setup | \`./scripts/transpilot doctor\` |
 | Audit hallucinations | \`/anti-hallucination <wave>\` |
 | Verify parity | \`/parity-checker $PROJECT_NAME [module]\` |
 | Diff-test behavior | \`/differential-tester <wave>\` |
 | Run E2E validation | \`/e2e-validator $PROJECT_NAME\` |
-| Check progress | \`/status\` |
 | Check index freshness | \`./scripts/check-codegraph-freshness.sh\` |
 | Check placeholders | \`./scripts/forbid-placeholders.sh src\` |
 | Check Oracle independence | \`./scripts/check-oracle-independence.sh tests\` |

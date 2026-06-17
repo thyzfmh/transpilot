@@ -7,7 +7,7 @@
 - **Go→Rust 翻译** — 类型映射、并发模式、错误处理、序列化兼容
 - **C→Rust 翻译** — 内存安全、指针消除、预处理器映射、FFI 互操作、unsafe 审计
 - **四层等价性验证** — 结构/功能/接口/行为 四层验证确保翻译正确性
-- **幻觉防御网** — anti-hallucination skill + 5 问检查清单 + 索引新鲜度校验
+- **幻觉防御网** — anti-hallucination skill + 6 问检查清单 + 索引新鲜度校验
 - **Wave 模式翻译** — 分批翻译，每批 3-5 模块，逐步推进
 - **自我改进系统** — 从翻译经验中自动积累模式
 - **E2E 诊断器** — 自动定位翻译引入的行为差异
@@ -57,6 +57,7 @@ graph TB
 ```
 
 Skill 间数据流契约见 [.agents/skills/shared/interfaces.md](.agents/skills/shared/interfaces.md)。
+OpenCode 用户入口见 [docs/cli.md](docs/cli.md)，产品质量红线见 [docs/product-principles.md](docs/product-principles.md)。
 
 ## 从 Taibai 提炼
 
@@ -68,28 +69,51 @@ Skill 间数据流契约见 [.agents/skills/shared/interfaces.md](.agents/skills
 
 ## 快速开始
 
+可选：把 `transpilot` 安装到本机 PATH：
+
+```bash
+./scripts/transpilot install
+```
+
 ### 1. 初始化翻译项目
 
 ```bash
-# Go 项目
-./scripts/init-project.sh my-project go /path/to/go/source /path/to/rust/target
-
-# C 项目
-./scripts/init-project.sh my-project c /path/to/c/source /path/to/rust/target
+# 自动识别 Go/C，目标语言默认 Rust
+transpilot init /path/to/source /path/to/rust/target
 ```
 
-### 2. 开始翻译
+### 2. 确认验收边界
+
+```bash
+cd /path/to/rust/target
+./scripts/transpilot acceptance review
+./scripts/transpilot acceptance confirm
+```
+
+`acceptance-plan.yaml` 未确认前，`run` 会拒绝启动。这是产品质量红线：
+Oracle 降级、E2E 缺失、范围不清等风险不能静默进入自动化。
+
+### 3. 开始翻译
 
 在 IDE 中打开目标项目，Agent 会自动加载相关技能：
 - 读取 `translation-state.jsonc` 恢复状态
 - 按 Wave 模式逐批翻译
 - 自动验证等价性
 
-### 3. 查看进度
+```bash
+./scripts/transpilot analyze /path/to/source
+# 或者只分析某个目标范围：
+./scripts/transpilot analyze /path/to/source --goal "迁移消息生命周期" --scope "include/foo.h,src/foo.c"
+./scripts/transpilot run --dry-run
+```
+
+`--dry-run` 会给出 OpenCode handoff；真实 Wave 执行仍由 OpenCode/Agent skills 负责。
+
+### 4. 查看进度
 
 ```bash
-./scripts/parity-report.sh summary
-./scripts/parity-report.sh risk
+./scripts/transpilot status
+./scripts/transpilot status --expert
 ```
 
 ## 目录结构

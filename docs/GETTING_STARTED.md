@@ -31,6 +31,8 @@ codegraph version
 ### 0.3 克隆 Transpilot
 ```bash
 git clone https://github.com/thyzfmh/transpilot.git ~/transpilot
+cd ~/transpilot
+./scripts/transpilot install
 ```
 
 ---
@@ -41,13 +43,14 @@ git clone https://github.com/thyzfmh/transpilot.git ~/transpilot
 
 ```bash
 cd ~/transpilot
-./scripts/init-project.sh myapp go /path/to/myapp-go /path/to/myapp-rs
+./scripts/transpilot init /path/to/myapp-go /path/to/myapp-rs --name myapp
 ```
 
 **这一步会自动:**
 - 创建 Rust workspace 骨架（`Cargo.toml`、`src/`）
 - 在目标项目中通过 symlink 挂载 `.agents/skills/`
 - 创建 `.opencode/translation-state.jsonc`（状态文件）和 `decisions.md`（决策日志）
+- 创建 `acceptance-plan.yaml`（T0 验收方案）
 - 写入 `AGENTS.md`（Agent 指令）和 `.gitignore`
 - 初始化 git 仓库
 
@@ -60,7 +63,23 @@ cat .opencode/translation-state.jsonc | head -20
 
 ---
 
-## Step 2: 为源项目和目标项目建立 CodeGraph 索引
+## Step 2: 确认验收边界
+
+```bash
+./scripts/transpilot acceptance review
+```
+
+检查 `scope.in/out`、`oracle_primary`、`e2e_command` 和 must-pass 用例。确认风险后运行：
+
+```bash
+./scripts/transpilot acceptance confirm
+```
+
+未确认前，`transpilot run` 和自驱 harness 都会拒绝启动。
+
+---
+
+## Step 3: 为源项目和目标项目建立 CodeGraph 索引
 
 ```bash
 # 源项目（Go）
@@ -79,18 +98,25 @@ codegraph status  # 应显示 nodes/edges 数量
 
 ---
 
-## Step 3: 用 AI 进行架构分析（首次）
+## Step 4: 用 AI 进行架构分析（首次）
 
-在 IDE（Claude Code/Cursor/Qoder 等）中打开 `/path/to/myapp-rs`，然后给 Agent 发：
+在 IDE（Claude Code/Cursor/Qoder/OpenCode 等）中打开 `/path/to/myapp-rs`，先运行分析：
 
+```bash
+./scripts/transpilot analyze /path/to/myapp-go
 ```
-请分析源项目架构，确定翻译顺序。
-源项目路径在 translation-state.jsonc 里有记录。
+
+如果只想翻译部分功能，带上目标和范围：
+
+```bash
+./scripts/transpilot analyze /path/to/myapp-go \
+  --goal "只迁移配置解析模块" \
+  --scope "pkg/config,internal/parser"
 ```
 
 **Agent 会自动:**
 1. 读 `translation-state.jsonc` 恢复上下文
-2. 加载 `translator` skill
+2. 把分析结果同步给你，并询问 scope / Oracle / E2E
 3. 用 `codegraph_explore` 分析源项目（**1 次 MCP 调用** 替代几十次 grep）
 4. 用 `codegraph impact` 计算依赖图
 5. 输出 Wave 计划：哪些模块先翻译、哪些后翻译
@@ -109,7 +135,7 @@ codegraph status  # 应显示 nodes/edges 数量
 
 ---
 
-## Step 4: 创建第一个 Wave 提案
+## Step 5: 创建第一个 Wave 提案
 
 ```
 请为 Wave 1 创建 OpenSpec 提案。
@@ -127,7 +153,7 @@ Agent 会执行 `/opsx-propose`，生成：
 
 ---
 
-## Step 5: 执行翻译
+## Step 6: 执行翻译
 
 ```
 按 tasks.md 执行 Wave 1。
@@ -152,7 +178,7 @@ Agent 会逐任务执行：
 
 ---
 
-## Step 6: 验证 Wave
+## Step 7: 验证 Wave
 
 ```
 运行 Wave 1 验证。
@@ -170,7 +196,7 @@ Agent 加载 `parity-checker` skill 执行四层验证：
 
 ---
 
-## Step 7: 重复 Step 4-6 直到完成
+## Step 8: 重复 Step 5-7 直到完成
 
 ```
 继续下一个 Wave。
@@ -182,7 +208,7 @@ Agent 会从 `translation-state.jsonc` 读取进度，自动开始 Wave 2。
 
 ---
 
-## Step 8: 最终验收
+## Step 9: 最终验收
 
 所有 Wave 完成后：
 

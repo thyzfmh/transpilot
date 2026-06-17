@@ -18,7 +18,7 @@ prerequisites:
 - 已有 codegraph 直接返回的代码搬运
 
 ## 核验决策树
-- "我说的源码行为对吗？" → `codegraph_node` 取原文 + 5 问检查
+- "我说的源码行为对吗？" → `codegraph_node` 取原文 + 6 问检查
 - "我用的目标 API 存在吗？" → 写最小 cargo check 片段或查 docs.rs
 - "这个常量是不是对的？" → grep 源码 + 行号引用
 - "调用方向对吗？" → `codegraph_callers` 双向核对
@@ -32,4 +32,4 @@ prerequisites:
 
 ## 详细参考
 - 5 类幻觉与对治 → `reference.md`
-- 函数级强制清单 → `checklist.md`
+- 函数级 6 问强制清单 → `checklist.md`

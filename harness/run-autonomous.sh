@@ -18,11 +18,12 @@ MAX_WAVES=${2:-20}
 WAVE=0
 RETRY_COUNT=0
 
-# 检查 acceptance-plan.yaml 存在
-if [ ! -f acceptance-plan.yaml ]; then
-  echo "ERROR: acceptance-plan.yaml not found. Run init-project.sh first." >&2
+# 检查 acceptance-plan.yaml 已经由用户确认，且确认后未改动。
+if [ ! -x scripts/check-acceptance-plan.sh ]; then
+  echo "ERROR: scripts/check-acceptance-plan.sh not found. Run transpilot init first." >&2
   exit 2
 fi
+./scripts/check-acceptance-plan.sh verify >/dev/null
 
 echo "Transpilot Autonomous Harness"
 echo "Target parity: ${TARGET}% | Max waves: $MAX_WAVES"

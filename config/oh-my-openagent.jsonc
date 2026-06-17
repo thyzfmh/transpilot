@@ -35,6 +35,21 @@
       "description": "四层等价性验证器",
       "triggers": ["check parity", "验证等价性"]
     },
+    "anti-hallucination": {
+      "path": ".agents/skills/anti-hallucination/SKILL.md",
+      "description": "翻译过程中的证据核验和幻觉防御",
+      "triggers": ["anti-hallucination", "幻觉", "证据核验"]
+    },
+    "differential-tester": {
+      "path": ".agents/skills/differential-tester/SKILL.md",
+      "description": "Oracle 独立的差分测试器",
+      "triggers": ["differential", "diff-test", "差分测试"]
+    },
+    "codegraph-navigator": {
+      "path": ".agents/skills/codegraph-navigator/SKILL.md",
+      "description": "基于 CodeGraph 的代码理解和导航",
+      "triggers": ["codegraph", "依赖图", "调用方"]
+    },
     "e2e-debugger": {
       "path": ".agents/skills/e2e-debugger/SKILL.md",
       "description": "E2E 失败诊断器",
@@ -57,9 +72,10 @@
     "translator-agent": {
       "role": "primary",
       "description": "主翻译 Agent — 负责执行翻译工作",
-      "skills": ["translator", "go2rust", "c2rust", "shared"],
+      "skills": ["translator", "go2rust", "c2rust", "shared", "codegraph-navigator", "anti-hallucination"],
       "instructions": [
-        "每次会话开始先恢复状态（读 translation-state.jsonc）",
+        "每次会话开始先恢复状态（读 .opencode/translation-state.jsonc）",
+        "Wave 1 前必须确认 acceptance-plan.yaml 已通过 transpilot acceptance confirm",
         "严格遵循 Wave 模式（3-5 模块/批）",
         "叶子优先翻译策略",
         "翻译后立即运行测试验证",
@@ -69,7 +85,7 @@
     "verifier-agent": {
       "role": "secondary",
       "description": "验证 Agent — 负责等价性验证和 E2E",
-      "skills": ["parity-checker", "e2e-debugger", "status-dashboard"],
+      "skills": ["parity-checker", "e2e-debugger", "status-dashboard", "differential-tester", "anti-hallucination"],
       "instructions": [
         "Wave 完成后自动触发验证",
         "四层等价性逐层检查",
@@ -114,8 +130,9 @@
 
   // 全局规则
   "rules": {
-    "state_file": "translation-state.jsonc",
-    "decisions_file": "decisions.md",
+    "state_file": ".opencode/translation-state.jsonc",
+    "decisions_file": ".opencode/decisions.md",
+    "acceptance_confirmation_file": ".opencode/acceptance-confirmation.json",
     "max_wave_size": 5,
     "min_wave_size": 3,
     "parity_threshold": 95,

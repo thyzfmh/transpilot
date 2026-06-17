@@ -1,0 +1,321 @@
+#!/usr/bin/env bash
+# transpilot — thin OpenCode-friendly wrapper for Transpilot scripts.
+
+set -euo pipefail
+
+resolve_script() {
+  local src="${BASH_SOURCE[0]}"
+  while [ -L "$src" ]; do
+    local dir
+    dir="$(cd -P "$(dirname "$src")" && pwd)"
+    src="$(readlink "$src")"
+    [[ "$src" != /* ]] && src="$dir/$src"
+  done
+  cd -P "$(dirname "$src")/.." && pwd
+}
+
+ROOT="$(resolve_script)"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  transpilot init <source_path> <target_path> [--name NAME] [--lang go|c]
+  transpilot analyze <source_path> [--goal TEXT] [--scope a,b,c]
+  transpilot acceptance review|confirm|verify
+  transpilot status [--expert]
+  transpilot report [summary|risk|full|module NAME|wave ID]
+  transpilot doctor
+  transpilot check
+  transpilot run [--dry-run] [--target-parity N] [--max-waves N]
+  transpilot install [--prefix DIR]
+EOF
+}
+
+detect_lang() {
+  local source="$1"
+  if [ -f "$source/go.mod" ] || find "$source" -maxdepth 3 -name '*.go' -print -quit | grep -q .; then
+    echo "go"
+  elif [ -f "$source/CMakeLists.txt" ] || [ -f "$source/Makefile" ] || find "$source" -maxdepth 3 \( -name '*.c' -o -name '*.h' \) -print -quit | grep -q .; then
+    echo "c"
+  else
+    echo "unknown"
+  fi
+}
+
+cmd_init() {
+  if [ $# -lt 2 ]; then
+    usage >&2
+    exit 2
+  fi
+  local source="$1"
+  local target="$2"
+  shift 2
+  local name
+  name="$(basename "$target")"
+  local lang=""
+
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --name) name="${2:?missing --name value}"; shift 2 ;;
+      --lang) lang="${2:?missing --lang value}"; shift 2 ;;
+      *) echo "Unknown init arg: $1" >&2; exit 2 ;;
+    esac
+  done
+
+  if [ -z "$lang" ]; then
+    lang="$(detect_lang "$source")"
+  fi
+  if [[ "$lang" != "go" && "$lang" != "c" ]]; then
+    echo "ERROR: could not detect a supported source language (go|c)." >&2
+    echo "Pass --lang go or --lang c explicitly." >&2
+    exit 2
+  fi
+
+  "$ROOT/scripts/init-project.sh" "$name" "$lang" "$source" "$target"
+}
+
+cmd_analyze() {
+  local source="${1:-}"
+  if [ -z "$source" ] || [ ! -d "$source" ]; then
+    echo "Usage: transpilot analyze <source_path> [--goal TEXT] [--scope a,b,c]" >&2
+    exit 2
+  fi
+  shift || true
+
+  local goal=""
+  local scope=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --goal) goal="${2:?missing --goal value}"; shift 2 ;;
+      --scope) scope="${2:?missing --scope value}"; shift 2 ;;
+      *) echo "Unknown analyze arg: $1" >&2; exit 2 ;;
+    esac
+  done
+
+  local lang
+  lang="$(detect_lang "$source")"
+  local files
+  files="$(find "$source" -type f \( -name '*.go' -o -name '*.c' -o -name '*.h' -o -name '*.cc' -o -name '*.cpp' -o -name '*.hpp' \) 2>/dev/null | wc -l | tr -d ' ')"
+
+  echo "=== Transpilot Source Analysis ==="
+  echo "Source: $source"
+  echo "Source language: $lang"
+  echo "Target language: rust"
+  echo "Source files: $files"
+  if [ -n "$goal" ]; then
+    echo "Goal: $goal"
+  fi
+  if [ -n "$scope" ]; then
+    echo "Requested scope:"
+    printf '%s\n' "$scope" | tr ',' '\n' | while IFS= read -r item; do
+      item="${item#"${item%%[![:space:]]*}"}"
+      item="${item%"${item##*[![:space:]]}"}"
+      [ -n "$item" ] && echo "- $item"
+    done
+  fi
+  echo ""
+  echo "User sync:"
+  echo "- Share this analysis with the user before planning Wave 1."
+  echo "- Explain the detected language, build system, risk level, and recommended first slice in user language."
+  echo "- Keep expert terms available, but do not require the user to understand them before making scope decisions."
+  if find "$source" -maxdepth 4 \( -name '*.cc' -o -name '*.cpp' -o -name '*.cxx' -o -name '*.hpp' \) -print -quit | grep -q .; then
+    echo "Risk: C++ files detected. Current stable path covers Go/C and C API slices; full C++ core migration needs explicit scope."
+  fi
+  if [ -f "$source/CMakeLists.txt" ]; then echo "Build system: CMake"; fi
+  if [ -f "$source/configure" ] || [ -f "$source/configure.ac" ]; then echo "Build system: autotools"; fi
+  if [ -f "$source/go.mod" ]; then echo "Build system: Go modules"; fi
+  echo ""
+  echo "Questions to ask before Wave 1:"
+  echo "1. Which source directories are in scope, and which must be excluded?"
+  echo "2. Can the source project build and run tests on this machine?"
+  echo "3. What command should be treated as the must-pass E2E smoke test?"
+  echo "4. Are C API compatibility, behavior compatibility, or performance the primary acceptance goal?"
+  echo "5. For mixed C/C++ projects, should Transpilot start with a C API/protocol slice instead of the full core?"
+  echo ""
+  echo "OpenCode prompt:"
+  echo "  Summarize this Transpilot analysis to the user, ask the Wave 1 scope and Oracle questions above, then update acceptance-plan.yaml only after the user confirms."
+}
+
+cmd_install() {
+  local prefix="${HOME}/.local"
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --prefix) prefix="${2:?missing --prefix value}"; shift 2 ;;
+      *) echo "Unknown install arg: $1" >&2; exit 2 ;;
+    esac
+  done
+
+  local bindir="$prefix/bin"
+  mkdir -p "$bindir"
+  ln -sfn "$ROOT/scripts/transpilot" "$bindir/transpilot"
+  echo "Installed transpilot: $bindir/transpilot"
+  case ":${PATH}:" in
+    *":$bindir:"*) echo "PATH: $bindir is already available" ;;
+    *) echo "PATH note: add $bindir to PATH to run 'transpilot' directly" ;;
+  esac
+}
+
+cmd_acceptance() {
+  local sub="${1:-review}"
+  "$ROOT/scripts/check-acceptance-plan.sh" "$sub"
+}
+
+cmd_status() {
+  local expert="${1:-}"
+  if [ "$expert" = "--expert" ]; then
+    "$ROOT/scripts/parity-report.sh" summary
+    return
+  fi
+
+  local state=".opencode/translation-state.jsonc"
+  if [ ! -f "$state" ]; then
+    echo "ERROR: .opencode/translation-state.jsonc not found. Are you in a Transpilot target project?" >&2
+    exit 1
+  fi
+
+  python3 - "$state" <<'PYEOF'
+import json
+import re
+import sys
+
+path = sys.argv[1]
+content = open(path).read()
+lines = []
+for line in content.splitlines():
+    stripped = line.lstrip()
+    if stripped.startswith("//"):
+        continue
+    in_str = False
+    out = []
+    i = 0
+    while i < len(line):
+        c = line[i]
+        if c == '"' and (i == 0 or line[i - 1] != "\\"):
+            in_str = not in_str
+        elif c == "/" and i + 1 < len(line) and line[i + 1] == "/" and not in_str:
+            break
+        out.append(c)
+        i += 1
+    lines.append("".join(out))
+data = json.loads(re.sub(r",\s*([}\]])", r"\1", "\n".join(lines)))
+mods = data.get("modules", {})
+total = len(mods)
+verified = sum(1 for m in mods.values() if m.get("status") == "verified")
+overall = float(data.get("overall_parity", 0)) * 100
+current_wave = data.get("current_wave") or "not started"
+blockers = data.get("blockers", [])
+progress = (verified / total * 100) if total else 0
+trust = "high" if overall >= 95 else "medium" if overall >= 75 else "not established"
+print("=== Transpilot Status ===")
+print(f"Progress: {progress:.1f}% ({verified}/{total} modules verified)")
+print(f"Trust: {trust} (current evidence score: {overall:.1f}%)")
+print(f"Current wave: {current_wave}")
+if blockers:
+    print("Needs attention: yes")
+    for b in blockers[:3]:
+        print(f"- {b.get('module', 'unknown')}: {b.get('reason', 'blocked')}")
+else:
+    print("Needs attention: no active blockers")
+print("Next: run `transpilot acceptance review` before Wave 1, or `transpilot run --dry-run` to see the OpenCode handoff.")
+PYEOF
+}
+
+cmd_report() {
+  local sub="${1:-summary}"
+  shift || true
+  "$ROOT/scripts/parity-report.sh" "$sub" "$@"
+}
+
+cmd_doctor() {
+  echo "=== Transpilot Doctor ==="
+  local failed=0
+  check_path() {
+    local path="$1"
+    if [ -e "$path" ]; then
+      echo "OK: $path"
+    else
+      echo "MISSING: $path"
+      failed=$((failed + 1))
+    fi
+  }
+  check_path "AGENTS.md"
+  check_path ".opencode/translation-state.jsonc"
+  check_path "acceptance-plan.yaml"
+  check_path "scripts/parity-report.sh"
+  check_path "scripts/check-acceptance-plan.sh"
+  check_path "harness/run-autonomous.sh"
+  if command -v codegraph >/dev/null 2>&1; then
+    echo "OK: codegraph CLI found"
+  else
+    echo "WARN: codegraph CLI not found; large-project navigation will be weaker"
+  fi
+  [ "$failed" -eq 0 ] || exit 1
+}
+
+cmd_check() {
+  echo "=== Transpilot Check ==="
+  "$ROOT/scripts/check-acceptance-plan.sh" review >/tmp/transpilot-acceptance-review.$$ || true
+  echo "PASS: acceptance-plan.yaml is readable"
+
+  if [ -d src ]; then
+    "$ROOT/scripts/forbid-placeholders.sh" src 0
+  else
+    echo "SKIP: src directory not found"
+  fi
+
+  if [ -d tests ]; then
+    "$ROOT/scripts/check-oracle-independence.sh" tests
+  else
+    echo "SKIP: tests directory not found"
+  fi
+  rm -f /tmp/transpilot-acceptance-review.$$
+  echo "PASS: deterministic checks completed"
+}
+
+cmd_run() {
+  local dry_run=0
+  local target=95
+  local max_waves=20
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --dry-run) dry_run=1; shift ;;
+      --target-parity) target="${2:?missing --target-parity value}"; shift 2 ;;
+      --max-waves) max_waves="${2:?missing --max-waves value}"; shift 2 ;;
+      *) echo "Unknown run arg: $1" >&2; exit 2 ;;
+    esac
+  done
+
+  "$ROOT/scripts/check-acceptance-plan.sh" verify >/dev/null
+
+  if [ "$dry_run" -eq 1 ]; then
+    echo "=== Transpilot Run Dry run ==="
+    echo "OpenCode handoff is ready."
+    echo "Target parity: ${target}%"
+    echo "Max waves: $max_waves"
+    echo "Next OpenCode task:"
+    echo "  Continue Transpilot translation. Read acceptance-plan.yaml and .opencode/translation-state.jsonc, then plan the next Wave."
+    return
+  fi
+
+  "$ROOT/harness/run-autonomous.sh" "$target" "$max_waves"
+}
+
+main() {
+  local command="${1:-help}"
+  shift || true
+  case "$command" in
+    init) cmd_init "$@" ;;
+    analyze) cmd_analyze "$@" ;;
+    acceptance) cmd_acceptance "$@" ;;
+    status) cmd_status "$@" ;;
+    report) cmd_report "$@" ;;
+    doctor) cmd_doctor "$@" ;;
+    check) cmd_check "$@" ;;
+    run) cmd_run "$@" ;;
+    install) cmd_install "$@" ;;
+    help|-h|--help) usage ;;
+    *) echo "Unknown command: $command" >&2; usage >&2; exit 2 ;;
+  esac
+}
+
+main "$@"

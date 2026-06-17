@@ -3,7 +3,7 @@ name: translator
 description: 统一翻译驱动器 — 检测源语言，加载技能，驱动完整翻译流程
 prerequisites:
   - codegraph-navigator (CodeGraph 已安装并索引)
-  - anti-hallucination (非平凡函数翻译前必过 5 问)
+  - anti-hallucination (非平凡函数翻译前必过 6 问)
   - 索引新鲜度 (scripts/check-codegraph-freshness.sh 通过)
 ---
 
@@ -15,7 +15,7 @@ prerequisites:
 
 ## 核心原则
 1. **CodeGraph First** — 探索代码用图查询，不暴力 grep
-2. **无证据不断言** — 每个非平凡函数过 anti-hallucination 5 问
+2. **无证据不断言** — 每个非平凡函数过 anti-hallucination 6 问
 3. **Wave 模式** — 3-5 模块/批，叶子优先
 4. **零占位符** — Wave 结束时 `forbid-placeholders.sh` 必须通过
 
