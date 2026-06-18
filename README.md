@@ -104,10 +104,12 @@ Oracle 降级、E2E 缺失、范围不清等风险不能静默进入自动化。
 ./scripts/transpilot analyze /path/to/source
 # 或者只分析某个目标范围：
 ./scripts/transpilot analyze /path/to/source --goal "迁移消息生命周期" --scope "include/foo.h,src/foo.c"
+./scripts/transpilot plan new wave-1 --goal "迁移消息生命周期" --scope "include/foo.h,src/foo.c"
+./scripts/transpilot plan review wave-1
 ./scripts/transpilot run --dry-run
 ```
 
-`--dry-run` 会给出 OpenCode handoff；真实 Wave 执行仍由 OpenCode/Agent skills 负责。
+每个 Wave 的 writing plan 会写入 `.opencode/plans/wave-001.md`。`--dry-run` 会给出 OpenCode handoff；真实 Wave 执行仍由 OpenCode/Agent skills 负责，完成后交由 review agent 检查，不达标就带着反馈继续本 Wave。
 
 ### 4. 查看进度
 

@@ -11,6 +11,8 @@
 ./scripts/transpilot acceptance review
 ./scripts/transpilot acceptance confirm
 ./scripts/transpilot acceptance verify
+./scripts/transpilot plan new <wave-id> [--goal TEXT] [--scope a,b,c]
+./scripts/transpilot plan review <wave-id>
 ./scripts/transpilot run --dry-run
 ./scripts/transpilot status
 ./scripts/transpilot status --expert
@@ -54,12 +56,23 @@
 5. Ask OpenCode to continue with the next Wave:
 
    ```bash
+   ./scripts/transpilot plan new wave-1 \
+     --goal "migrate the user-confirmed slice" \
+     --scope "path/a,path/b"
+   ./scripts/transpilot plan review wave-1
+   ```
+
+   The Wave writing plan lives in `.opencode/plans/wave-001.md`. It is the minimum executable contract for the Wave: goal, behavior requirements, atomic tasks, test matrix, acceptance criteria, verification commands, and review gate.
+
+6. Hand the plan to OpenCode:
+
+   ```bash
    ./scripts/transpilot run --dry-run
    ```
 
    The command prints the handoff prompt. The actual translation work remains in OpenCode skills.
 
-6. Track progress:
+7. Track progress:
 
    ```bash
    ./scripts/transpilot status
@@ -100,4 +113,12 @@ Ask me to confirm scope, Oracle strategy, E2E smoke command, and acceptance prio
 Only after I confirm, update acceptance-plan.yaml and ask me to run:
   ./scripts/transpilot acceptance review
   ./scripts/transpilot acceptance confirm
+
+Then create a Wave writing plan:
+  ./scripts/transpilot plan new wave-1 --goal "<goal>" --scope "<scope>"
+
+Fill the plan with source evidence, precise input/output behavior, boundary cases, full test matrix, and verification commands.
+Execute one atomic task at a time.
+After implementation, hand the Wave to a review agent.
+If the review agent says tests, evidence, or behavior are insufficient, continue the same Wave with that feedback until the review gate passes.
 ```

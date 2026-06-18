@@ -32,6 +32,12 @@ Transpilot automates migration work, but it must not hide delivery risk from the
    - Early interaction is expected: scope, Oracle strategy, E2E command, and acceptance priorities should be clarified before automation starts.
    - Superpowers-style brainstorming/planning is appropriate at this stage; it should reduce risk, not expose unnecessary internals.
 
+8. **Every Wave needs a writing plan**
+   - Before implementation, OpenCode must produce `.opencode/plans/wave-NNN.md`.
+   - The plan must describe the goal, functional requirements, exact inputs/outputs, boundaries, atomic tasks, test matrix, verification commands, and review gate.
+   - Tests must be sufficient. Happy-path-only tests are not acceptable.
+   - A review agent must inspect the completed Wave. If the review finds weak tests, missing evidence, or behavior drift, OpenCode continues the same Wave with that feedback until the gate passes.
+
 ## OpenCode Product Shape
 
 The public entry point is the thin CLI wrapper:

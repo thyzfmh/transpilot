@@ -135,12 +135,15 @@ cat > AGENTS.md << AGENTSEOF
 13. Oracle independence — expected values from src_run()/fixtures/codegraph only; never AI-derived. Enforced by \`scripts/check-oracle-independence.sh\`
 14. T0 acceptance plan — acceptance-plan.yaml must be user-confirmed before wave-1
 15. Analyze sync before Wave 1 — after project analysis, summarize findings to the user and ask scope/Oracle/E2E questions before planning the first Wave
+16. Wave writing plan first — every Wave needs .opencode/plans/wave-NNN.md with goal, requirements, atomic tasks, full test matrix, acceptance criteria, and review-agent feedback loop before implementation
 
 ## Skill Usage
 | I want to... | Run |
 |---|---|
 | Review acceptance gate | \`./scripts/transpilot acceptance review\` |
 | Confirm acceptance gate | \`./scripts/transpilot acceptance confirm\` |
+| Create Wave plan | \`./scripts/transpilot plan new wave-1 --goal "..." --scope "..."\` |
+| Review Wave plan | \`./scripts/transpilot plan review wave-1\` |
 | Start/continue translating | \`./scripts/transpilot run --dry-run\` then follow the OpenCode handoff |
 | Check progress | \`./scripts/transpilot status\` |
 | Expert progress | \`./scripts/transpilot status --expert\` |

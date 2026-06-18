@@ -155,6 +155,17 @@ Agent 会执行 `/opsx-propose`，生成：
 
 ## Step 6: 执行翻译
 
+先为 Wave 生成 writing plan：
+
+```bash
+./scripts/transpilot plan new wave-1 \
+  --goal "翻译 Wave 1 用户确认范围" \
+  --scope "pkg/config,internal/parser"
+./scripts/transpilot plan review wave-1
+```
+
+OpenCode 必须先填充 `.opencode/plans/wave-001.md`，再开始写代码。这个 plan 是本 Wave 的最小执行契约：需求点、输入/输出、边界条件、原子任务、测试全集、验收标准和评审门禁都要写清楚。
+
 ```
 按 tasks.md 执行 Wave 1。
 ```
@@ -175,6 +186,8 @@ Agent 会逐任务执行：
 - AI 主动报告"需要决策"（设计歧义）
 - AI 报告"卡住了"（外部依赖缺失）
 - 你看到 AI 走偏了想干预
+
+Wave 完成后由 review agent 检查是否达标。测试必须充分，不能只覆盖 happy path；如果评审指出证据、行为或测试不足，OpenCode 必须带着反馈继续完成同一个 Wave，直到评审门禁通过。
 
 ---
 

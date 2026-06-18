@@ -100,8 +100,28 @@ assert_contains "$install_out" "Installed transpilot"
 test -L "$install_home/.local/bin/transpilot" || fail "transpilot install did not create symlink"
 "$install_home/.local/bin/transpilot" help >/dev/null
 
+plan_out="$(cd "$TMP/target" && ./scripts/transpilot plan new wave-1 --goal "translate message lifecycle" --scope "main.go,internal/msg")"
+assert_contains "$plan_out" ".opencode/plans/wave-001.md"
+test -f "$TMP/target/.opencode/plans/wave-001.md" || fail "wave plan was not created"
+plan_text="$(cat "$TMP/target/.opencode/plans/wave-001.md")"
+assert_contains "$plan_text" "Functional Requirements"
+assert_contains "$plan_text" "Atomic Tasks"
+assert_contains "$plan_text" "Test Matrix"
+assert_contains "$plan_text" "Acceptance Criteria"
+assert_contains "$plan_text" "Review Agent Gate"
+assert_contains "$plan_text" "Goal for OpenCode"
+assert_contains "$plan_text" "No shallow tests"
+assert_contains "$plan_text" "translate message lifecycle"
+assert_contains "$plan_text" "main.go"
+
+plan_review_out="$(cd "$TMP/target" && ./scripts/transpilot plan review wave-1)"
+assert_contains "$plan_review_out" "Wave Plan Review"
+assert_contains "$plan_review_out" "Review agent"
+
 run_out="$(cd "$TMP/target" && ./scripts/transpilot run --dry-run)"
 assert_contains "$run_out" "Dry run"
 assert_contains "$run_out" "OpenCode"
+assert_contains "$run_out" "Goal for OpenCode"
+assert_contains "$run_out" "Review agent"
 
 echo "test_transpilot_cli.sh: PASS"

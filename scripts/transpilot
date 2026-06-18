@@ -22,6 +22,9 @@ Usage:
   transpilot init <source_path> <target_path> [--name NAME] [--lang go|c]
   transpilot analyze <source_path> [--goal TEXT] [--scope a,b,c]
   transpilot acceptance review|confirm|verify
+  transpilot plan new <wave-id> [--goal TEXT] [--scope a,b,c]
+  transpilot plan review <wave-id>
+  transpilot plan verify <wave-id>
   transpilot status [--expert]
   transpilot report [summary|risk|full|module NAME|wave ID]
   transpilot doctor
@@ -160,6 +163,190 @@ cmd_acceptance() {
   "$ROOT/scripts/check-acceptance-plan.sh" "$sub"
 }
 
+normalize_wave_id() {
+  local raw="$1"
+  raw="${raw#wave-}"
+  raw="${raw#0}"
+  raw="${raw#0}"
+  if ! [[ "$raw" =~ ^[0-9]+$ ]]; then
+    echo "ERROR: wave id must look like wave-1 or 1" >&2
+    exit 2
+  fi
+  printf 'wave-%03d' "$raw"
+}
+
+latest_plan_path() {
+  local latest
+  latest="$(find .opencode/plans -maxdepth 1 -name 'wave-*.md' 2>/dev/null | sort | tail -1 || true)"
+  [ -n "$latest" ] && echo "$latest"
+}
+
+cmd_plan_new() {
+  local wave_raw="${1:-}"
+  if [ -z "$wave_raw" ]; then
+    echo "Usage: transpilot plan new <wave-id> [--goal TEXT] [--scope a,b,c]" >&2
+    exit 2
+  fi
+  shift || true
+
+  local goal=""
+  local scope=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --goal) goal="${2:?missing --goal value}"; shift 2 ;;
+      --scope) scope="${2:?missing --scope value}"; shift 2 ;;
+      *) echo "Unknown plan new arg: $1" >&2; exit 2 ;;
+    esac
+  done
+  [ -n "$goal" ] || goal="Define a minimal, behavior-complete translation slice for this Wave"
+
+  local wave_id plan_path
+  wave_id="$(normalize_wave_id "$wave_raw")"
+  mkdir -p .opencode/plans
+  plan_path=".opencode/plans/${wave_id}.md"
+
+  {
+    echo "# ${wave_id} Writing Plan"
+    echo ""
+    echo "## Goal for OpenCode"
+    echo ""
+    echo "$goal"
+    echo ""
+    echo "OpenCode execution rule: complete this Wave one atomic task at a time. After each task, run its verification commands and update this plan. When all tasks are complete, hand the result to a review agent. If the review agent reports gaps, continue the same Wave with the feedback until the review gate passes."
+    echo ""
+    echo "## User-Confirmed Scope"
+    echo ""
+    echo "- Source scope:"
+    if [ -n "$scope" ]; then
+      printf '%s\n' "$scope" | tr ',' '\n' | while IFS= read -r item; do
+        item="${item#"${item%%[![:space:]]*}"}"
+        item="${item%"${item##*[![:space:]]}"}"
+        [ -n "$item" ] && echo "  - $item"
+      done
+    else
+      echo "  - TODO: list exact source files/directories"
+    fi
+    echo "- Explicitly out of scope:"
+    echo "  - TODO: list modules/features this Wave must not touch"
+    echo ""
+    echo "## Source Evidence"
+    echo ""
+    echo "- TODO: cite source files, functions, constants, and CodeGraph nodes used to define this Wave."
+    echo "- No behavior claim may be implemented without source evidence or user confirmation."
+    echo ""
+    echo "## Functional Requirements"
+    echo ""
+    echo "| ID | Behavior | Inputs | Outputs | Boundary / Error Cases | Source Evidence |"
+    echo "|---|---|---|---|---|---|"
+    echo "| FR-001 | TODO: precise behavior | TODO | TODO | TODO | TODO |"
+    echo ""
+    echo "## Atomic Tasks"
+    echo ""
+    echo "Each task must be small enough to complete and verify independently. Prefer tasks of 200 changed lines or less."
+    echo ""
+    echo "### T-001: TODO: first atomic translation task"
+    echo ""
+    echo "**Purpose:** TODO"
+    echo ""
+    echo "**Source files:** TODO"
+    echo ""
+    echo "**Target files:** TODO"
+    echo ""
+    echo "**Behavior requirements:**"
+    echo "- TODO: describe exact input/output behavior."
+    echo "- TODO: describe edge cases and error behavior."
+    echo ""
+    echo "**Acceptance Criteria:**"
+    echo "- [ ] Source behavior is cited."
+    echo "- [ ] Rust implementation matches behavior, not just API shape."
+    echo "- [ ] No placeholders remain in this task's target files."
+    echo "- [ ] Tests cover happy path, boundary cases, and error cases."
+    echo "- [ ] Expected values come from src_run(), fixture, static source evidence, or user-confirmed constants."
+    echo ""
+    echo "**Test Matrix:**"
+    echo "- Happy path: TODO"
+    echo "- Empty / zero / null-equivalent input: TODO"
+    echo "- Invalid input / error path: TODO"
+    echo "- Boundary size / repeated call / resource lifecycle: TODO"
+    echo "- Regression case from source tests: TODO"
+    echo ""
+    echo "**Verification commands:**"
+    echo "- TODO: cargo check / cargo test / differential test command"
+    echo ""
+    echo "**Done when:** all acceptance criteria are checked and verification commands pass."
+    echo ""
+    echo "## Wave-Level Acceptance Criteria"
+    echo ""
+    echo "- [ ] All atomic tasks are complete."
+    echo "- [ ] Test Matrix is filled for every task. No shallow tests."
+    echo "- [ ] \`./scripts/forbid-placeholders.sh src 0\` passes."
+    echo "- [ ] \`./scripts/check-oracle-independence.sh tests\` passes when tests exist."
+    echo "- [ ] \`cargo check\` and relevant \`cargo test\` commands pass."
+    echo "- [ ] E2E smoke from \`acceptance-plan.yaml\` is run or explicitly escalated."
+    echo "- [ ] Behavior diffs are recorded and either fixed or user-approved."
+    echo ""
+    echo "## Review Agent Gate"
+    echo ""
+    echo "A review agent must inspect this Wave after implementation. It should verify:"
+    echo ""
+    echo "1. Every functional requirement has tests."
+    echo "2. Tests are meaningful and include boundary/error cases; no shallow tests."
+    echo "3. Oracle independence is preserved."
+    echo "4. Source evidence supports the translated behavior."
+    echo "5. Verification commands actually ran and passed."
+    echo ""
+    echo "If any item fails, the review agent writes feedback here and OpenCode continues this Wave until the gate passes."
+    echo ""
+    echo "### Review Feedback"
+    echo ""
+    echo "- Pending review."
+    echo ""
+    echo "## Risks / Escalation Conditions"
+    echo ""
+    echo "- TODO: list ambiguity, missing Oracle, missing E2E, unsafe/ABI risks, or external dependency risks."
+  } > "$plan_path"
+
+  echo "Created Wave writing plan: $plan_path"
+  echo "Next: ask OpenCode to fill TODOs from source evidence, then have the user review before implementation."
+}
+
+cmd_plan_review() {
+  local wave_raw="${1:-}"
+  if [ -z "$wave_raw" ]; then
+    echo "Usage: transpilot plan review <wave-id>" >&2
+    exit 2
+  fi
+  local wave_id plan_path missing=0
+  wave_id="$(normalize_wave_id "$wave_raw")"
+  plan_path=".opencode/plans/${wave_id}.md"
+  if [ ! -f "$plan_path" ]; then
+    echo "ERROR: wave plan not found: $plan_path" >&2
+    exit 1
+  fi
+  echo "=== Wave Plan Review ==="
+  echo "Plan: $plan_path"
+  grep -q "Functional Requirements" "$plan_path" || { echo "MISSING: Functional Requirements"; missing=$((missing + 1)); }
+  grep -q "Atomic Tasks" "$plan_path" || { echo "MISSING: Atomic Tasks"; missing=$((missing + 1)); }
+  grep -q "Test Matrix" "$plan_path" || { echo "MISSING: Test Matrix"; missing=$((missing + 1)); }
+  grep -q "Acceptance Criteria" "$plan_path" || { echo "MISSING: Acceptance Criteria"; missing=$((missing + 1)); }
+  grep -q "Review Agent Gate" "$plan_path" || { echo "MISSING: Review Agent Gate"; missing=$((missing + 1)); }
+  if grep -q "TODO" "$plan_path"; then
+    echo "Review required: TODO markers remain. Fill them before implementation."
+  fi
+  echo "Review agent: after implementation, inspect this plan and send feedback if any acceptance criterion is weak or unverified."
+  [ "$missing" -eq 0 ] || exit 1
+}
+
+cmd_plan() {
+  local sub="${1:-}"
+  shift || true
+  case "$sub" in
+    new) cmd_plan_new "$@" ;;
+    review|verify) cmd_plan_review "$@" ;;
+    *) echo "Usage: transpilot plan new|review|verify ..." >&2; exit 2 ;;
+  esac
+}
+
 cmd_status() {
   local expert="${1:-}"
   if [ "$expert" = "--expert" ]; then
@@ -292,8 +479,17 @@ cmd_run() {
     echo "OpenCode handoff is ready."
     echo "Target parity: ${target}%"
     echo "Max waves: $max_waves"
+    local plan_path
+    plan_path="$(latest_plan_path || true)"
+    if [ -n "$plan_path" ]; then
+      echo "Wave plan: $plan_path"
+    else
+      echo "Wave plan: not found yet. Create one with ./scripts/transpilot plan new wave-1 --goal \"...\" --scope \"...\""
+    fi
     echo "Next OpenCode task:"
-    echo "  Continue Transpilot translation. Read acceptance-plan.yaml and .opencode/translation-state.jsonc, then plan the next Wave."
+    echo "  Goal for OpenCode: execute the current Wave writing plan one atomic task at a time."
+    echo "  Read acceptance-plan.yaml, .opencode/translation-state.jsonc, and the Wave plan."
+    echo "  After implementation, hand the Wave to a Review agent. If feedback says tests or behavior are insufficient, continue the same Wave until the gate passes."
     return
   fi
 
@@ -307,6 +503,7 @@ main() {
     init) cmd_init "$@" ;;
     analyze) cmd_analyze "$@" ;;
     acceptance) cmd_acceptance "$@" ;;
+    plan) cmd_plan "$@" ;;
     status) cmd_status "$@" ;;
     report) cmd_report "$@" ;;
     doctor) cmd_doctor "$@" ;;

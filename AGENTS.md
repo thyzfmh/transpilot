@@ -36,6 +36,7 @@ Born from Taibai (Rust reimplementation of Kubernetes v1.36), generalizing 30+ t
 13. **Oracle independence** — expected values come from `src_run()`, fixtures, or static codegraph; never from AI. Enforced by `scripts/check-oracle-independence.sh`
 14. **T0 acceptance plan** — every project starts with `acceptance-plan.yaml` (template at `templates/acceptance-plan.yaml.template`), user-confirmed before wave-1
 15. **Analyze sync before Wave 1** — after project analysis, summarize findings to the user and ask scope/Oracle/E2E questions before planning the first Wave
+16. **Wave writing plan first** — every Wave needs `.opencode/plans/wave-NNN.md` with goal, requirements, atomic tasks, full test matrix, acceptance criteria, and review-agent feedback loop before implementation
 
 ## Skill Usage
 
