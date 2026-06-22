@@ -58,6 +58,7 @@ graph TB
 
 Skill 间数据流契约见 [.agents/skills/shared/interfaces.md](.agents/skills/shared/interfaces.md)。
 OpenCode 用户入口见 [docs/cli.md](docs/cli.md)，产品质量红线见 [docs/product-principles.md](docs/product-principles.md)。
+通用反 AI 幻觉机制见 [docs/anti-hallucination-mechanism.md](docs/anti-hallucination-mechanism.md)。
 
 ## 从 Taibai 提炼
 
