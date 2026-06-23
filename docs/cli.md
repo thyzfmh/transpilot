@@ -14,6 +14,7 @@
 ./scripts/transpilot plan new <wave-id> [--goal TEXT] [--scope a,b,c]
 ./scripts/transpilot plan review <wave-id>
 ./scripts/transpilot run --dry-run
+./scripts/transpilot competition flashdb init <flashdb_source_path> <target_path>
 ./scripts/transpilot status
 ./scripts/transpilot status --expert
 ./scripts/transpilot doctor
@@ -98,6 +99,29 @@ For a partial migration, pass a goal and scope:
 ```
 
 OpenCode should summarize the analysis, ask the user to confirm the proposed slice, then update `acceptance-plan.yaml` only after confirmation.
+
+## FlashDB Competition Harness
+
+For the FlashDB C-to-Rust competition, use the thin harness profile instead of the full migration wrapper:
+
+```bash
+./scripts/transpilot competition flashdb init ./code/FlashDB ./flashdb_rust
+```
+
+The generated `flashdb_rust` project contains:
+
+- `Cargo.toml`, `src/`, and `tests/`;
+- `AGENTS.md` with OpenCode execution rules;
+- `harness/analyze_flashdb.sh`;
+- `harness/plan_next_task.sh`;
+- `harness/build_check.sh`;
+- `harness/repair_loop.sh`;
+- `harness/test_all.sh`;
+- `harness/unsafe_audit.sh`;
+- `harness/final_verify.sh`;
+- `plans/` and `reports/`.
+
+This profile is intentionally C-to-Rust only and keeps the competition deliverable focused on the harness engineering requirements.
 
 ## Direct OpenCode Prompt
 

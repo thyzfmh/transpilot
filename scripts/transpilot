@@ -27,6 +27,7 @@ Usage:
   transpilot plan verify <wave-id>
   transpilot status [--expert]
   transpilot report [summary|risk|full|module NAME|wave ID]
+  transpilot competition flashdb init <flashdb_source_path> <target_path>
   transpilot doctor
   transpilot check
   transpilot run [--dry-run] [--target-parity N] [--max-waves N]
@@ -413,6 +414,25 @@ cmd_report() {
   "$ROOT/scripts/parity-report.sh" "$sub" "$@"
 }
 
+cmd_competition() {
+  local profile="${1:-}"
+  local sub="${2:-}"
+  shift 2 || true
+  case "$profile:$sub" in
+    flashdb:init)
+      if [ $# -ne 2 ]; then
+        echo "Usage: transpilot competition flashdb init <flashdb_source_path> <target_path>" >&2
+        exit 2
+      fi
+      "$ROOT/scripts/init-flashdb-competition.sh" "$1" "$2"
+      ;;
+    *)
+      echo "Usage: transpilot competition flashdb init <flashdb_source_path> <target_path>" >&2
+      exit 2
+      ;;
+  esac
+}
+
 cmd_doctor() {
   echo "=== Transpilot Doctor ==="
   local failed=0
@@ -506,6 +526,7 @@ main() {
     plan) cmd_plan "$@" ;;
     status) cmd_status "$@" ;;
     report) cmd_report "$@" ;;
+    competition) cmd_competition "$@" ;;
     doctor) cmd_doctor "$@" ;;
     check) cmd_check "$@" ;;
     run) cmd_run "$@" ;;

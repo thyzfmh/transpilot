@@ -59,6 +59,7 @@ graph TB
 Skill 间数据流契约见 [.agents/skills/shared/interfaces.md](.agents/skills/shared/interfaces.md)。
 OpenCode 用户入口见 [docs/cli.md](docs/cli.md)，产品质量红线见 [docs/product-principles.md](docs/product-principles.md)。
 通用反 AI 幻觉机制见 [docs/anti-hallucination-mechanism.md](docs/anti-hallucination-mechanism.md)。
+FlashDB 比赛专用 C→Rust harness 见 [docs/competition-flashdb.md](docs/competition-flashdb.md)。
 
 ## 从 Taibai 提炼
 
@@ -111,6 +112,16 @@ Oracle 降级、E2E 缺失、范围不清等风险不能静默进入自动化。
 ```
 
 每个 Wave 的 writing plan 会写入 `.opencode/plans/wave-001.md`。`--dry-run` 会给出 OpenCode handoff；真实 Wave 执行仍由 OpenCode/Agent skills 负责，完成后交由 review agent 检查，不达标就带着反馈继续本 Wave。
+
+### FlashDB 比赛 Harness
+
+如果目标是 AI 编码大赛中的 FlashDB C→Rust 重写，使用更薄的比赛 profile：
+
+```bash
+./scripts/transpilot competition flashdb init ./code/FlashDB ./flashdb_rust
+```
+
+该命令生成自包含 `flashdb_rust` Cargo 工程、`harness/` 验证脚本、`plans/` 原子任务计划和 OpenCode 执行说明，避免暴露完整 Transpilot 工具链。
 
 ### 4. 查看进度
 
