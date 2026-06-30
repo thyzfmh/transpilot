@@ -61,6 +61,18 @@ OpenCode 用户入口见 [docs/cli.md](docs/cli.md)，产品质量红线见 [doc
 通用反 AI 幻觉机制见 [docs/anti-hallucination-mechanism.md](docs/anti-hallucination-mechanism.md)。
 FlashDB 比赛专用 C→Rust harness 见 [docs/competition-flashdb.md](docs/competition-flashdb.md)。
 
+## 竞赛交付入口
+
+如果按竞赛平台目录运行作品，请以仓库根目录的 [INSTRUCTION.md](INSTRUCTION.md) 为入口：
+
+```text
+INSTRUCTION.md
+work/skill/SKILL.md
+work/scripts/init-c-to-rust-project.sh
+```
+
+`./scripts/transpilot competition flashdb init ...` 是本源码仓库内的开发入口，用于生成同类 Rust 迁移工程。平台评测时优先使用 `INSTRUCTION.md` 和 `work/` 下的交付件。
+
 ## 从 Taibai 提炼
 
 本工具链的核心经验来自 Taibai 项目（Kubernetes v1.36 Go→Rust 翻译）：

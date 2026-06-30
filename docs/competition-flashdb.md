@@ -25,6 +25,16 @@ For this scenario, a heavy orchestration layer is counterproductive. The generat
 
 ## Usage
 
+For platform evaluation, use the packaged entry:
+
+```text
+INSTRUCTION.md
+work/skill/SKILL.md
+work/scripts/init-c-to-rust-project.sh
+```
+
+The command below is the repository development shortcut. It is useful when working inside this Transpilot source tree, but the packaged `work/` entry is the one expected by the competition delivery layout.
+
 Prepare the competition source:
 
 ```bash
@@ -89,4 +99,3 @@ This profile intentionally favors boring, auditable engineering over broad autom
 - one target crate: `flashdb_rust`;
 - one verification path: Cargo build/test plus unsafe audit;
 - one product promise: OpenCode can keep repairing from concrete error stacks.
-

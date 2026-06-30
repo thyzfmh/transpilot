@@ -4,6 +4,7 @@
 
 Transpilot is a standalone, reusable toolkit for translating large codebases from Go or C to Rust.
 Born from Taibai (Rust reimplementation of Kubernetes v1.36), generalizing 30+ translation decisions and 8 critical lessons.
+Now also incorporating 8 lessons from the FlashDB C→Rust complete translation (5 anti-patterns added: AP-007 to AP-011).
 
 ## Supported Languages
 
@@ -18,6 +19,14 @@ Born from Taibai (Rust reimplementation of Kubernetes v1.36), generalizing 30+ t
 - Templates: `templates/`
 - Config: `config/`
 - Scripts: `scripts/`
+- Competition package entry: `INSTRUCTION.md`
+- Competition package skill: `work/skill/SKILL.md`
+- Competition package script: `work/scripts/init-c-to-rust-project.sh`
+
+## Entry Point Notes
+
+For platform evaluation, use `INSTRUCTION.md` and the files under `work/`.
+The command `./scripts/transpilot competition flashdb init ...` is a repository development shortcut that generates the same style of Rust migration project from inside the Transpilot source tree.
 
 ## Core Rules
 
@@ -37,6 +46,10 @@ Born from Taibai (Rust reimplementation of Kubernetes v1.36), generalizing 30+ t
 14. **T0 acceptance plan** — every project starts with `acceptance-plan.yaml` (template at `templates/acceptance-plan.yaml.template`), user-confirmed before wave-1
 15. **Analyze sync before Wave 1** — after project analysis, summarize findings to the user and ask scope/Oracle/E2E questions before planning the first Wave
 16. **Wave writing plan first** — every Wave needs `.opencode/plans/wave-NNN.md` with goal, requirements, atomic tasks, full test matrix, acceptance criteria, and review-agent feedback loop before implementation
+17. **thread_local! for test counters** — `static mut` in tests causes parallel test failures; always use `thread_local! { Cell<T> }` (AP-007)
+18. **Coverage gap analysis after each Wave** — list all C test functions, check each has a Rust equivalent (AP-011)
+19. **GC/sector tests need computed sizes** — value sizes from C macros, not round numbers (AP-010)
+20. **Autonomous mode** — when user provides source path, run full translation without asking questions until final_verify.sh passes; only escalate on 3× Wave failure or source bugs
 
 ## Skill Usage
 
