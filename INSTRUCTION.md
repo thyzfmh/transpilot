@@ -18,27 +18,17 @@
 
 - 源码目录：用户提供的 C 项目目录，目录内应包含 `src/`
 - Rust 工程目录：默认 `<源码目录>_rust`
-- 工程名称：默认 `<源码目录名>_rust`，例如 `FlashDB` 默认生成 `flashdb_rust`
+- 工程名称：默认 `<源码目录名>_rust`，例如 `FlashDB` 默认生成 `FlashDB_rust`
 
-## 推荐执行方式
+## 执行方式
 
-优先加载并执行 Skill：
+加载并执行 Skill：
 
 ```text
-work/skill/SKILL.md
+work/skill/c-to-rust/SKILL.md
 ```
 
-如果平台不支持 Skill，可直接执行脚本：
-
-```bash
-bash work/scripts/init-c-to-rust-project.sh <source_path> <target_path> [project_name]
-```
-
-示例：
-
-```bash
-bash work/scripts/init-c-to-rust-project.sh ./code/FlashDB ./flashdb_rust flashdb_rust
-```
+该 Skill 包含完整的初始化步骤和验证流程，无需依赖外部脚本。
 
 ## 初始化后的用户说明
 
@@ -47,7 +37,6 @@ bash work/scripts/init-c-to-rust-project.sh ./code/FlashDB ./flashdb_rust flashd
 ```text
 我已经生成 Rust 迁移工程，里面包含：
 - Rust 项目结构
-- 源码分析脚本
 - 构建和测试脚本
 - 编译错误修复流程
 - unsafe 检查
@@ -61,18 +50,10 @@ bash work/scripts/init-c-to-rust-project.sh ./code/FlashDB ./flashdb_rust flashd
 进入生成的 Rust 工程目录后运行：
 
 ```bash
-./harness/analyze_flashdb.sh <source_path>
-./harness/plan_next_task.sh task-001 "Translate the first C-to-Rust source slice" "<source_path>/src"
 ./harness/build_check.sh
 ./harness/test_all.sh
 ./harness/unsafe_audit.sh 10
 ./harness/final_verify.sh
 ```
 
-如果编译失败，运行：
-
-```bash
-./harness/repair_loop.sh
-```
-
-然后让 OpenCode 根据 `reports/repair-request.md` 中的 error stack 精准打补丁。
+验证不通过则持续修复直到全部通过。
