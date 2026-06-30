@@ -60,5 +60,37 @@ Before implementing any task:
 - `openspec-workflow.md` — OpenSpec 变更治理工作流（propose/apply/archive/sync）
 - `parity-checker.md` — Four-layer equivalence verification protocol
 - `e2e-validator.md` — E2E validation framework
-- `anti-patterns.md` — Six universal translation anti-patterns
+- `anti-patterns.md` — Eleven universal translation anti-patterns (AP-001 to AP-011)
+- `lessons-flashdb.md` — FlashDB translation lessons (L-001 to L-008)
 - `interfaces.md` — Skill 间数据流契约（v1.0）
+
+## Unwrap Classification
+
+Not all `unwrap()` is equal. Classify before removing:
+
+| Pattern | Safety | Action |
+|---------|--------|--------|
+| `buf[offset..offset+4].try_into().unwrap()` (compile-time-known size) | ✅ Safe | Keep — can never fail |
+| `option.unwrap()` after `if option.is_none() { return }` guard | ✅ Safe | Keep — provably Some |
+| `result.unwrap()` on IO / user input / dynamic size | ❌ Unsafe | Replace with `?` or `map_err` |
+| `result.unwrap()` on external dependency output | ❌ Unsafe | Replace with proper error propagation |
+
+## Verification Script Ordering
+
+The order of checks in verification scripts matters:
+
+```
+1. cargo fmt --check   ← cheapest, catches style issues first
+2. cargo check         ← type correctness
+3. cargo test          ← functional correctness
+4. unsafe audit        ← safety compliance
+5. placeholder audit   ← completeness
+```
+
+Rationale: Formatting issues indicate hasty code. Catch them early before deeper analysis.
+
+## Clean-Room Verification Rule
+
+Any deliverable (init script, build script, verify script) MUST be tested in a clean/temporary environment before claiming it works. "Works on my machine" is not a delivery standard.
+
+Test command: run the script in `/tmp/` or equivalent, verify `cargo check` passes on generated output.

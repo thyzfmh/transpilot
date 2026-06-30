@@ -60,6 +60,46 @@ Extracted from Taibai (K8s → Rust) project lessons L001-L008. These apply to A
 **Savings**: Average 70% work reduction when prior infrastructure exists.
 **When it doesn't help**: True greenfield phases (Phase 2+) — but tight task breakdown compensates.
 
+## AP-007: Shared Mutable Test State
+
+**Source**: FlashDB L-001
+**Description**: Tests use `static mut` or `AtomicI32` for counters/timestamps. Under `cargo test` parallel execution, threads share state, causing intermittent failures.
+**Detection**: `static mut` or `static ATOMIC` in test files used as mutable counters.
+**Rule**: Test counters MUST use `thread_local! { Cell<T> }`. Each test thread gets its own isolated copy.
+**Cost of ignoring**: Tests pass in isolation but fail under `cargo test` — classic heisenbug.
+
+## AP-008: Agent Self-Report Trust
+
+**Source**: FlashDB L-002
+**Description**: Deep agent runs for 51 minutes, reports "I have bugs in tsl_iter_by_time". Reality: all 107 tests pass — agent fixed its own bugs during the run.
+**Detection**: Agent output contains "this might have issues" / "there are bugs" / "needs debugging".
+**Rule**: Only `cargo test` exit code is truth. Agent self-reports must be independently verified. Never trust agent's final assessment without running the actual verification.
+**Cost of ignoring**: Wasting time "fixing" non-existent bugs, or ignoring real bugs because agent said "it works".
+
+## AP-009: Self-Written Test Assertions (Oracle Independence Violation)
+
+**Source**: FlashDB L-003, differential-tester skill
+**Description**: AI writes both the code AND the expected values in `assert_eq!(result, 42)`. The 42 is AI-derived, not independently verified.
+**Detection**: String/number literal expected values in test assertions. `assert_eq!(foo(), "expected")` where "expected" is not from source execution.
+**Rule**: Expected values MUST come from: (1) source project runtime output, (2) static codegraph analysis, (3) user confirmation. AI-derived expected values are banned.
+**Cost of ignoring**: Tests pass but prove nothing — self-verification is circular.
+
+## AP-010: Guessed Sector Layout
+
+**Source**: FlashDB L-004
+**Description**: GC test fails because KV value sizes don't match the C test's computed sizes. Picking "round number" values (256, 512) instead of computing from the same formulas as C.
+**Detection**: Test constants that look "nice" (powers of 2, round numbers) in GC/overflow/sector-boundary tests.
+**Rule**: For tests depending on sector layout (GC, overflow, allocation), value sizes MUST be computed from the same formulas as the C test. Port the `_TKV_*` macro computation exactly.
+**Cost of ignoring**: GC never triggers, or triggers at wrong time — test proves nothing about GC correctness.
+
+## AP-011: Missing Post-Wave Coverage Gap
+
+**Source**: FlashDB L-006
+**Description**: Wave 3 completed with 26 TSDB tests. But C test's `test_fdb_tsl_iter_by_time_1` (multi-sector iteration) had no Rust equivalent. Gap only discovered when building C Oracle diff test.
+**Detection**: After Wave completion, no explicit comparison of Rust test list vs C test function list.
+**Rule**: After each Wave, list all C test functions and verify each has a Rust equivalent. Any missing = mandatory addition before next Wave.
+**Cost of ignoring**: Entire categories of edge cases untested until late in the project.
+
 ## Anti-Pattern Decision Matrix
 
 | Situation | Anti-Pattern Risk | Mitigation |
@@ -70,3 +110,8 @@ Extracted from Taibai (K8s → Rust) project lessons L001-L008. These apply to A
 | Rust code looks like Go/C | AP-004 | Code review for idioms |
 | Same task fails twice | AP-005 | Decompose + probe |
 | "Implement X" task received | AP-006 | grep X first |
+| `static mut` in test file | AP-007 | Replace with thread_local! |
+| Agent says "this is broken" | AP-008 | Run cargo test independently |
+| `assert_eq!(result, 42)` in test | AP-009 | Get 42 from source project |
+| Nice round numbers in GC test | AP-010 | Compute from C test macros |
+| Wave done, no coverage gap check | AP-011 | List C tests, find missing Rust equivalents |

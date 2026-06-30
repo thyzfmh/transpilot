@@ -75,6 +75,19 @@
 3.3 回归检查
     - 确保之前 Wave 的模块仍然通过
     - 检查新翻译是否引入回归
+
+3.4 覆盖率差距分析（AP-011 强制）
+    - 列出源项目所有测试函数
+    - 检查每个是否有对应的 Rust 测试
+    - 缺失的 = 必须在下一 Wave 前补齐
+    - 特别关注：GC 测试、多扇区边界测试、reboot 持久化测试
+
+3.5 C Oracle 差分测试（Wave 1 后首次建立）
+    - 编译 C 源项目，确认 Oracle 可用
+    - 建 C Oracle 程序（basic CRUD + GC + multi-sector + reboot）
+    - 写 Rust diff tests，解析 C 输出，比对结果
+    - 标记 #[ignore]，用 cargo test -- --ignored 运行
+    - 差分测试失败 = 行为不等价，必须修复
 ```
 
 ### Step 4: 状态更新
@@ -142,3 +155,83 @@
 - 不同 Agent 负责不同模块
 - 通过 translation-state.jsonc 同步状态
 - 合并时检查接口一致性
+
+## 自主模式
+
+当用户给出源项目路径并要求翻译时，系统进入自主模式。全程不问用户，直到最终验证通过。
+
+### 自主模式触发
+
+用户说：
+- "帮我把 /path/to/project 翻译成 Rust"
+- "把这个 C 项目用 Rust 重写"
+- "迁移 /path/to/source 到 Rust"
+
+### 自主模式流程
+
+```
+用户给路径
+  ↓
+Phase 0: 检测与初始化
+  ├─ 检测源语言 → 加载 c2rust/go2rust
+  ├─ 运行 init 脚本 → 创建 Rust 骨架
+  ├─ 运行 analyze → source-inventory.md
+  ├─ 尝试编译 C 源 → 确认 Oracle 可用性
+  └─ 自动确认 acceptance-plan.yaml
+  ↓
+Phase 1: 规划
+  ├─ 拓扑排序 → 叶子优先
+  └─ 写 wave-001.md
+  ↓
+Phase 2: 翻译循环 [每个 Wave]
+  ├─ 逐模块翻译（接口→实现→测试→验证）
+  ├─ 每模块完成后: cargo fmt + check + test
+  ├─ 每模块最多 3 轮修复
+  ├─ Wave 完成后:
+  │   ├─ unsafe_audit + forbid-placeholders
+  │   ├─ 覆盖率差距分析（AP-011）
+  │   ├─ 补齐缺失测试
+  │   └─ 更新 translation-state + decisions
+  ├─ Wave 1 后: 建 C Oracle + diff tests
+  └─ 下一 Wave
+  ↓
+Phase 3: 最终验证
+  ├─ 全部 C Oracle（basic + GC + multi-sector + reboot）
+  ├─ 全部 diff tests vs C Oracle
+  ├─ final_verify.sh
+  ├─ rustdoc 全部公开 API
+  ├─ 更新 README + reports
+  └─ 输出完成报告
+```
+
+### 自主模式默认决策
+
+| 原本需要问用户的问题 | 自动决策 |
+|---|---|
+| 翻译范围 | src/ + tests/ |
+| E2E 何时跑 | 第一个模块后立即 |
+| WRITE_GRAN | 检测 C 源定义，默认 1 |
+| 文件模式 | 检测 C 源 #define，有则启用 |
+| Oracle 模式 | C 可编译→run-source；否则→static-codegraph |
+| unsafe 阈值 | 10% |
+| 并行翻译 | Wave 内独立模块可并行 |
+| 设计歧义 | 选更 Rust-idiomatic 的方案，记录到 decisions.md |
+
+### 自主模式失败恢复
+
+| 失败 | 处理 |
+|---|---|
+| 编译错误 | 读 error stack → 精准修补 → 最多 3 轮 |
+| 3 轮失败 | 缩小翻译范围 → 拆分模块重试 |
+| 测试失败 | 对比 C 预期 → 修复 → 最多 3 轮 |
+| 3 轮测试失败 | 回退到上一通过状态 → 缩范围 |
+| C Oracle 编译失败 | 降级到 static-codegraph Oracle |
+| Deep agent 超时 | AP-005: 先 probe 代码状态 |
+| 同模块 3 个 Wave 都失败 | **暂停，报告用户** |
+
+### 自主模式唯一升级条件
+
+只有以下情况暂停并报告用户（其余全部自动处理）：
+1. 源项目无法编译且无法降级 Oracle
+2. 同一模块连续 3 个 Wave 失败
+3. 发现源代码本身有 bug
