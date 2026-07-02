@@ -3,9 +3,7 @@
 ## 翻译目标
 
 - **源码目录**: `code/FlashDB` (C)
-- **目标**: 翻译为 Rust，项目名称 `flashDB_rust`
-- **构建方式**: `cargo build` 构建为可执行文件
-- **测试框架**: Rust 主流测试框架（`#[test]` + `cargo test`）
+- **目标**: `code/flashDB_rust` (Rust)
 
 ## 交互时间线
 

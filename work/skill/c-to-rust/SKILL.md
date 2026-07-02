@@ -1,64 +1,50 @@
 ---
 name: c-to-rust
-description: Use when the user asks to translate, rewrite, migrate, port, or reimplement a C/C++ project or source directory into Rust, especially when they provide a source path and want a Rust target project, tests, compile repair workflow, unsafe audit, or OpenCode execution flow.
+description: Translate the FlashDB C project to Rust. Executes the full migration flow automatically — init, translate, verify, fix — until final_verify.sh passes.
 ---
 
-# C to Rust Migration
+# FlashDB C → Rust Migration
 
-Use this skill when the user says something like:
+This skill translates the FlashDB C project to Rust. The source and target paths are fixed.
 
-- `帮我把 /path/to/project 翻译成 Rust`
-- `把这个 C 项目用 Rust 重写`
-- `迁移 /path/to/source 到 Rust`
+## Fixed Paths
 
-## User-facing principles
+- **Source**: `code/FlashDB` (C)
+- **Target**: `code/flashDB_rust` (Rust)
+- **Project name**: `flashDB_rust`
+- **Crate name**: `flashdb_rust` (lowercase snake_case for Cargo)
 
-- Do not mention competition, pinned commit, harness, profile, Wave, Oracle, or hallucination metrics.
-- Treat the provided source directory as the migration baseline.
-- Ask only for missing required information.
-- If output directory or project name is missing, choose safe defaults and tell the user.
+## Core Rule
 
-## Defaults
+**Execute the ENTIRE flow below without stopping. Do NOT ask the user any questions. Do NOT pause between phases. Keep going until `final_verify.sh` passes.**
 
-Given source path `/a/b/FlashDB`:
+If a verification step fails, fix it immediately and re-verify. Keep fixing until it passes.
 
-- target path: `/a/b/FlashDB_rust`
-- project name: `FlashDB_rust`
-- crate name: `flashdb_rust` (lowercase snake_case for Cargo)
-- migration scope: `src/` and `tests/`
-- validation: Rust build, Rust tests, unsafe ratio under 10%
+Only escalate to the user if:
+1. The source project cannot compile and no Oracle fallback exists
+2. The same module fails 3 consecutive Waves
+3. A bug is found in the source code itself
 
-## Intake flow
+## Phase 0: Intake
 
-1. Extract the source path from the user's request.
-2. If no source path is present, ask: `请告诉我要翻译的源码目录。`
-3. If source path does not exist or has no `src/`, report the concrete problem.
-4. Derive target path and project name from defaults unless user provided them.
-5. Tell the user what will happen in plain language:
+1. Verify `code/FlashDB` exists and contains `src/`. If not, report the problem and stop.
+2. Tell the user what will happen:
 
    ```text
-   我会按 C→Rust 迁移流程处理这个项目：
+   我会按 C→Rust 迁移流程处理 FlashDB：
 
-   - 源项目：<source>
-   - Rust 工程：<target>
-   - 工程名称：<name>
-   - 默认迁移范围：src 和 tests
+   - 源项目：code/FlashDB
+   - Rust 工程：code/flashDB_rust
+   - 工程名称：flashDB_rust
+   - 迁移范围：src 和 tests
    - 验证方式：Rust 编译、Rust 测试、unsafe 占比检查
 
-   接下来我会先初始化 Rust 工程，不会立即改写源码。
+   接下来我会自动完成翻译，直到最终验证通过。
    ```
 
-6. Initialize the Rust project by following the steps in **Project Initialization** below.
-7. After initialization, run the verification commands in **Quick Verification**.
-8. Report the generated path and next action:
+3. Proceed to **Phase 1** immediately.
 
-   ```text
-   已生成 Rust 迁移工程：<target>
-
-   下一步我会分析源码结构，生成第一批迁移任务，然后逐步实现和验证。
-   ```
-
-## Project Initialization
+## Phase 1: Project Initialization
 
 In the target directory, create the following structure. Adjust `<CRATE_NAME>` to the lowercase snake_case version of the project name.
 
@@ -143,18 +129,11 @@ rustflags = ["-Dwarnings"]
 .DS_Store
 ```
 
-### 8. Initialize git
+### 8. Harness Scripts
 
-```bash
-cd <target> && git init
-```
+Create these scripts under `harness/`:
 
-## Harness Scripts
-
-Create these scripts under `harness/` in the target project. They are short shell scripts that wrap standard cargo commands.
-
-### harness/build_check.sh
-
+**harness/build_check.sh**
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
@@ -174,8 +153,7 @@ mkdir -p reports
 } 2>&1 | tee reports/build-check.log
 ```
 
-### harness/test_all.sh
-
+**harness/test_all.sh**
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
@@ -187,8 +165,7 @@ mkdir -p reports
 } 2>&1 | tee reports/test-report.log
 ```
 
-### harness/unsafe_audit.sh
-
+**harness/unsafe_audit.sh**
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
@@ -239,8 +216,7 @@ if ratio >= threshold:
 PYEOF
 ```
 
-### harness/final_verify.sh
-
+**harness/final_verify.sh**
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
@@ -275,15 +251,125 @@ echo "Final verification passed. Wrote reports/final-report.md"
 
 After creating all harness scripts, run `chmod +x harness/*.sh`.
 
-## Quick Verification
-
-After initialization, verify the project compiles and the smoke test passes:
+### 9. Initialize git and verify
 
 ```bash
+cd <target> && git init
 cargo check --all-targets
 cargo test
 ```
 
-## Execution rule
+Verification must pass. If it fails, fix it before proceeding.
 
-Never claim success without running the verification commands. If a command fails, summarize the exact failure and fix it. Keep fixing until all verifications pass.
+## Phase 2: Source Analysis
+
+1. Read the C source directory structure under `<source>/src/`.
+2. Identify all `.c` and `.h` files.
+3. Determine module dependencies: which files include which headers.
+4. Produce a topological sort: translate leaf modules (no internal deps) first.
+5. Write a brief `reports/source-inventory.md` listing source files, their sizes, and recommended translation order.
+6. Try to compile the C source project. If it compiles, note that C Oracle is available for differential testing.
+
+Proceed to **Phase 3** immediately.
+
+## Phase 3: Wave Translation Loop
+
+Repeat the following until ALL C source modules have been translated to Rust:
+
+### Wave Planning
+
+1. Pick the next 3-5 leaf modules (dependencies already translated or no dependencies).
+2. Write a brief wave plan to `plans/wave-NNN.md` listing the modules and expected deliverables.
+
+### Module Translation (for each module in the wave)
+
+1. **Read the C source file** thoroughly. Understand every function, constant, type, and macro.
+2. **Translate types and constants** first. Map C structs/enums/defines to Rust types/consts.
+3. **Translate function signatures**. Apply C→Rust mapping rules:
+   - `malloc/free` → `Box`/`Vec`/`Arc`
+   - `*T` (owned) → `Box<T>`
+   - `*T` (borrowed) → `&T`/`&mut T`
+   - `*T` (nullable) → `Option<&T>`
+   - `#define CONST` → `const`/`static`
+   - `#define MACRO(x)` → `macro_rules!` or inline function
+   - `#ifdef` → `#[cfg(...)]`
+   - `int cmd + void* arg` → Rust enum
+   - `fn pointer + void*` → `&mut dyn FnMut`
+   - `static char buffer` → `String`/`Vec<u8>`
+4. **Translate function bodies**. Preserve behavior, not API shape.
+5. **Port C tests** to Rust. Use `#[test]` + `cargo test`. Rules:
+   - Test counters: use `thread_local! { Cell<T> }` instead of `static mut`
+   - GC test values: compute from C macros, not round numbers
+   - Cover happy path, boundary, error, and regression cases
+6. **Verify immediately**:
+   ```bash
+   cargo fmt
+   cargo check --all-targets
+   cargo test
+   ```
+   If any command fails, read the error, fix precisely, and re-verify. Max 3 fix rounds per module. If still failing, narrow the translation scope and retry.
+
+### Wave Verification
+
+After all modules in the wave are translated:
+
+1. Run:
+   ```bash
+   cargo fmt
+   cargo check --all-targets
+   cargo test --all-targets
+   ./harness/unsafe_audit.sh 10
+   ```
+2. Check for placeholders:
+   ```bash
+   grep -RInE 'todo!\(|unimplemented!\(|panic!\("TODO|placeholder' src tests
+   ```
+   If any found, replace with real implementation.
+3. Compare C test list against Rust test list. Fill any coverage gaps.
+4. If this is Wave 1: build C Oracle programs for differential testing (see Phase 4).
+
+If verification fails, fix and re-verify until it passes. Then proceed to the next wave.
+
+## Phase 4: C Oracle Differential Testing (after Wave 1)
+
+If the C source compiles, build C Oracle programs to verify behavioral equivalence:
+
+1. Write small C programs that exercise key behaviors (basic CRUD, GC, multi-sector, reboot persistence).
+2. Each program outputs results to stdout in a parseable format (JSONL or key=value).
+3. Build them: `gcc -I<source>/inc <source>/src/*.c oracle_<test>.c -o oracle/oracle_<test>`
+4. Write Rust differential tests that:
+   - Run the C Oracle program, parse its output
+   - Replay the same operations in Rust
+   - Compare results
+   - Mark with `#[ignore]`, run with `cargo test -- --ignored`
+5. All differential tests must pass. If any fails, investigate the behavioral difference and fix the Rust implementation.
+
+## Phase 5: Final Verification
+
+After ALL modules are translated and ALL waves pass:
+
+1. Run:
+   ```bash
+   ./harness/final_verify.sh
+   ```
+2. Run all differential tests:
+   ```bash
+   cargo test --test diff_* -- --ignored
+   ```
+3. Add rustdoc to all public APIs.
+4. Update README.md with project documentation.
+
+**If `final_verify.sh` fails, fix the failure and re-run. Keep going until it passes.**
+
+## Summary: The Loop
+
+```
+Phase 0 (Intake)
+  → Phase 1 (Init project)
+    → Phase 2 (Analyze source)
+      → Phase 3 (Wave loop: translate → verify → fix → next wave)
+        → Phase 4 (C Oracle diff tests, after Wave 1)
+          → Phase 5 (Final verify)
+```
+
+**DO NOT STOP between phases. DO NOT ask the user questions. Keep executing until `final_verify.sh` passes.**
