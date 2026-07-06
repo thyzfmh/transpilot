@@ -10,7 +10,7 @@
 加载并执行 Skill：
 
 ```text
-work/skill/c-to-rust/SKILL.md
+work/skills/c-to-rust/SKILL.md
 ```
 
 该 Skill 包含从项目初始化到最终验证的完整自主流程。源码路径和目标路径已固定，加载后按步骤执行，不中断，不提问，直到 `final_verify.sh` 通过。

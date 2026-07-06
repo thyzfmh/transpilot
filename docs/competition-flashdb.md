@@ -29,7 +29,7 @@ For platform evaluation, use the packaged entry:
 
 ```text
 INSTRUCTION.md
-work/skill/SKILL.md
+work/skills/SKILL.md
 work/scripts/init-c-to-rust-project.sh
 ```
 

@@ -67,7 +67,7 @@ FlashDB 比赛专用 C→Rust harness 见 [docs/competition-flashdb.md](docs/com
 
 ```text
 INSTRUCTION.md
-work/skill/SKILL.md
+work/skills/SKILL.md
 work/scripts/init-c-to-rust-project.sh
 ```
 

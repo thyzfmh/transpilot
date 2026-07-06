@@ -6,7 +6,7 @@
 
 - `/INSTRUCTION.md`
 - `/work`
-- `/work/skill/SKILL.md`
+- `/work/skills/SKILL.md`
 - `/work/scripts/init-c-to-rust-project.sh`
 - `/result/output.md`
 - `/result/screenshot`

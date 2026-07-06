@@ -2,7 +2,7 @@
 
 ## Your Task
 
-**Translate FlashDB from C to Rust.** Execute the skill at `work/skill/c-to-rust/SKILL.md` and follow it to completion.
+**Translate FlashDB from C to Rust.** Execute the skill at `work/skills/c-to-rust/SKILL.md` and follow it to completion.
 
 - **Source**: `code/FlashDB` (C)
 - **Target**: `code/flashDB_rust` (Rust)
@@ -13,7 +13,7 @@
 ## Entry Point
 
 1. Read and follow `INSTRUCTION.md`
-2. Load and execute `work/skill/c-to-rust/SKILL.md`
+2. Load and execute `work/skills/c-to-rust/SKILL.md`
 3. Keep going until Phase 5 (Final Verification) passes
 
 ## Core Rules
@@ -33,5 +33,5 @@
 
 ## Additional Skills
 
-- `work/skill/superpowers/` — general development skills (brainstorming, TDD, debugging, writing plans, etc.)
-- `work/skill/openspec-*/` — structured change management (propose, apply, explore, archive, sync)
+- `work/skills/superpowers/` — general development skills (brainstorming, TDD, debugging, writing plans, etc.)
+- `work/skills/openspec-*/` — structured change management (propose, apply, explore, archive, sync)
