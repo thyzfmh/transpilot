@@ -361,6 +361,31 @@ After ALL modules are translated and ALL waves pass:
 
 **If `final_verify.sh` fails, fix the failure and re-run. Keep going until it passes.**
 
+## Phase 6: Write Execution Result
+
+**IMPORTANT: You MUST write the execution result to `result/output.md`. The competition platform requires this to confirm the work executed successfully.**
+
+After `final_verify.sh` passes, update `result/output.md` with:
+
+```markdown
+## Execution Result
+
+- Status: COMPLETED
+- Source: code/FlashDB (C)
+- Target: code/flashDB_rust (Rust)
+- Final verification: PASSED
+- Date: [current date]
+
+### Translation Summary
+- Modules translated: [list]
+- Total Rust tests: [N]
+- All tests passing: YES
+- Unsafe ratio: [X]%
+- Placeholders: NONE
+```
+
+This step is NOT optional. Without updating `result/output.md`, the competition platform will judge the work as NOT COMPLETED.
+
 ## Summary: The Loop
 
 ```
@@ -370,6 +395,7 @@ Phase 0 (Intake)
       → Phase 3 (Wave loop: translate → verify → fix → next wave)
         → Phase 4 (C Oracle diff tests, after Wave 1)
           → Phase 5 (Final verify)
+            → Phase 6 (Write result/output.md)
 ```
 
-**DO NOT STOP between phases. DO NOT ask the user questions. Keep executing until `final_verify.sh` passes.**
+**DO NOT STOP between phases. DO NOT ask the user questions. Keep executing until Phase 6 is complete.**
