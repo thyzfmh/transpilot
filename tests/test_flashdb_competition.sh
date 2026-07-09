@@ -18,6 +18,28 @@ assert_contains() {
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
+skill_files="$(find "$ROOT/work/skills" -type f | sort)"
+expected_skill="$ROOT/work/skills/flashdb-rust-autonomous/SKILL.md"
+if [ "$skill_files" != "$expected_skill" ]; then
+  fail "work/skills must contain exactly one named skill file: work/skills/flashdb-rust-autonomous/SKILL.md"$'\n'"actual:"$'\n'"$skill_files"
+fi
+
+instruction_text="$(cat "$ROOT/INSTRUCTION.md")"
+assert_contains "$instruction_text" "work/skills/flashdb-rust-autonomous/SKILL.md"
+if [[ "$instruction_text" == *"c-to-rust"* || "$instruction_text" == *"openspec"* || "$instruction_text" == *"superpowers"* ]]; then
+  fail "INSTRUCTION.md must only ask OpenCode to load work/skills/flashdb-rust-autonomous/SKILL.md"
+fi
+if [[ "$instruction_text" == *"不加载其它 skill"* || "$instruction_text" == *"Do not load any other skill"* ]]; then
+  fail "INSTRUCTION.md should not emphasize loading no other skills"
+fi
+if [ -f "$ROOT/work/skills/SKILL.md" ]; then
+  fail "work/skills/SKILL.md must not exist; skills must live under work/skills/{skill-name}/SKILL.md"
+fi
+if [ -d "$ROOT/.agent" ] || [ -d "$ROOT/.agents" ]; then
+  fail ".agent/.agents directory must not exist in the competition package"
+fi
+assert_contains "$instruction_text" "Skill 名称：flashdb-rust-autonomous"
+
 FLASHDB="$TMP/code/FlashDB"
 mkdir -p "$FLASHDB/src" "$FLASHDB/tests"
 

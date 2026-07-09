@@ -166,7 +166,7 @@ if [ $EXIT_CODE -eq 1 ]; then
   echo "  3. Use UPPER_CASE constants for fixture data"
   echo "  4. Add '// oracle:ok' comment if this is a deliberate known-value test"
   echo ""
-  echo "See: .agents/skills/differential-tester/reference.md"
+  echo "See: work/skills/flashdb-rust-autonomous/SKILL.md"
   exit 1
 elif [ $EXIT_CODE -ne 0 ]; then
   echo "[oracle-independence] ERROR: python script failed (exit=$EXIT_CODE)" >&2

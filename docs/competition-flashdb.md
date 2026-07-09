@@ -1,101 +1,53 @@
 # FlashDB Competition Harness
 
-This branch adds a thin C-to-Rust competition profile for the FlashDB rewrite task.
+This repository is currently shaped as a FlashDB C-to-Rust competition package.
 
-The goal is not to expose the full Transpilot toolchain. The goal is to generate a practical harness project that OpenCode can use to migrate FlashDB one verified slice at a time.
+## Platform Entry
 
-## Why This Profile Is Thin
-
-The competition asks for a harness engineering deliverable:
-
-- rewrite `./code/FlashDB/src` as Rust;
-- rewrite `./code/FlashDB/tests` as Rust tests;
-- keep the Rust crate buildable and executable;
-- keep production `unsafe` below 10%;
-- use compile errors and test failures as a repair loop.
-
-For this scenario, a heavy orchestration layer is counterproductive. The generated project keeps only what the competition can evaluate:
-
-- a Rust crate named `flashdb_rust`;
-- `AGENTS.md` with OpenCode execution rules;
-- task plans under `plans/`;
-- deterministic harness scripts under `harness/`;
-- reports under `reports/`;
-- compile, test, repair, unsafe audit, and final verification commands.
-
-## Usage
-
-For platform evaluation, use the packaged entry:
+OpenCode should start from the root file:
 
 ```text
 INSTRUCTION.md
-work/skills/SKILL.md
-work/scripts/init-c-to-rust-project.sh
 ```
 
-The command below is the repository development shortcut. It is useful when working inside this Transpilot source tree, but the packaged `work/` entry is the one expected by the competition delivery layout.
-
-Prepare the competition source:
-
-```bash
-git clone https://gitcode.com/xwxf/FlashDB ./code/FlashDB
-cd ./code/FlashDB
-git checkout -b competition f9d0421315c564fb890a1b14eee77b290e0d7bbe
-```
-
-Generate the harness:
-
-```bash
-transpilot competition flashdb init ./code/FlashDB ./flashdb_rust
-```
-
-Open `./flashdb_rust` in OpenCode.
-
-Then run:
-
-```bash
-./harness/analyze_flashdb.sh ./code/FlashDB
-./harness/plan_next_task.sh task-001 "Translate the first FlashDB behavior slice" "./code/FlashDB/src"
-```
-
-Ask OpenCode to follow:
-
-- `AGENTS.md`;
-- `acceptance-plan.yaml`;
-- `reports/source-inventory.md`;
-- the current `plans/task-*.md`.
-
-## Generated Harness Commands
-
-```bash
-./harness/analyze_flashdb.sh [source]
-./harness/plan_next_task.sh <task-id> <goal> <scope>
-./harness/build_check.sh
-./harness/repair_loop.sh
-./harness/test_all.sh
-./harness/unsafe_audit.sh 10
-./harness/final_verify.sh
-```
-
-## OpenCode Loop
+That file names the executable skill:
 
 ```text
-read task plan
-  -> cite source evidence
-  -> implement the smallest C-to-Rust slice
-  -> port or generate Rust tests from FlashDB source behavior
-  -> run build/test/unsafe audit
-  -> if failing, run repair_loop and patch from compiler/test output
-  -> update plans and reports
-  -> continue with the next task only after verification passes
+work/skills/flashdb-rust-autonomous/SKILL.md
 ```
 
-## Design Bias
+`transpilot init` is not a skill and is not required for the competition run.
 
-This profile intentionally favors boring, auditable engineering over broad automation:
+## Fixed Contract
 
-- one language path: C to Rust;
-- one benchmark project shape: FlashDB;
-- one target crate: `flashdb_rust`;
-- one verification path: Cargo build/test plus unsafe audit;
-- one product promise: OpenCode can keep repairing from concrete error stacks.
+- Source: `code/FlashDB`
+- Target: `code/flashDB_rust`
+- Rust crate name: `flashdb_rust`
+- Final verification: `code/flashDB_rust/harness/final_verify.sh`
+- Result report: `result/output.md`
+
+## Skill Responsibilities
+
+The skill must close the whole loop:
+
+1. inspect FlashDB C source and tests;
+2. design the Rust representation from source evidence;
+3. implement FlashDB behavior in Rust;
+4. port source-backed Rust tests;
+5. run build, tests, unsafe audit, and placeholder audit;
+6. fix failures from concrete compiler or test output;
+7. repeat until `final_verify.sh` passes;
+8. update `result/output.md`.
+
+The skill includes the FlashDB-specific C-to-Rust tactics: byte-layout
+translation, explicit endian helpers, flash backend traits, status table
+bit-pattern helpers, aligned length formulas, GC and sector state machines, and
+unsafe auditing.
+
+## Final Gate
+
+The competition run is not complete until this command exits successfully:
+
+```bash
+cd code/flashDB_rust && ./harness/final_verify.sh
+```

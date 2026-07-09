@@ -6,8 +6,7 @@
 
 - `/INSTRUCTION.md`
 - `/work`
-- `/work/skills/SKILL.md`
-- `/work/scripts/init-c-to-rust-project.sh`
+- `/work/skills/flashdb-rust-autonomous/SKILL.md`
 - `/result/output.md`
 - `/result/screenshot`
 - `/logs/interaction.md`
@@ -19,20 +18,31 @@
 
 ## 本次自验证结果
 
-已使用一个最小 C 源码目录完成端到端自验证：
+已将平台入口收口为一个 OpenCode Skill：
 
 ```text
-SELF_VERIFY_PASS
+work/skills/flashdb-rust-autonomous/SKILL.md
 ```
 
-验证覆盖：
+该 Skill 固定执行：
 
-- 生成 Rust 迁移工程；
-- 生成 `Cargo.toml`、`AGENTS.md`、执行脚本、计划目录和报告目录；
-- 运行源码分析；
-- 生成第一批迁移任务；
-- 运行 Rust 编译检查；
-- 运行 Rust 测试；
-- 运行 unsafe 占比检查，结果为 `0.00%`；
-- 运行最终验证并生成 `reports/final-report.md`。
+- 源项目：`code/FlashDB`
+- Rust 目标：`code/flashDB_rust`
+- 执行方式：不中断循环翻译、修复、验证
+- 完成条件：`code/flashDB_rust/harness/final_verify.sh` 通过
 
+历史自验证记录见 `logs/trace/self-verify.log`。
+
+## 本次入口收口验证
+
+- Date: 2026-07-09
+- Skill entry: PASSED (`work/skills/flashdb-rust-autonomous/SKILL.md`)
+- Skill name in `INSTRUCTION.md`: PASSED (`flashdb-rust-autonomous`)
+- `.agents` directory removed: PASSED
+- `INSTRUCTION.md` entry: PASSED
+- Skill format validation: PASSED
+- Root harness test: PASSED
+- Root CLI test: PASSED
+- C source tests: PASSED
+- Target final verification: NOT RERUN in this packaging pass because `code/flashDB_rust` is not present in the current worktree
+- Target verification owner: `work/skills/flashdb-rust-autonomous/SKILL.md`

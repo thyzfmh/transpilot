@@ -21,7 +21,6 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TRANSPILOT_ROOT="$(dirname "$SCRIPT_DIR")"
-TEMPLATE_DIR="$TRANSPILOT_ROOT/templates"
 TODAY=$(date +%Y-%m-%d)
 
 echo "Transpilot — 初始化翻译项目"
@@ -42,57 +41,102 @@ fi
 mkdir -p .opencode
 
 # translation-state.jsonc
-sed -e "s/__PROJECT_NAME__/$PROJECT_NAME/g" \
-    -e "s/__SOURCE_LANG__/$SOURCE_LANG/g" \
-    -e "s|__SOURCE_PATH__|$SOURCE_PATH|g" \
-    -e "s|__TARGET_PATH__|$TARGET_PATH|g" \
-    -e "s/__START_DATE__/$TODAY/g" \
-    "$TEMPLATE_DIR/translation-state.template.jsonc" > .opencode/translation-state.jsonc
+cat > .opencode/translation-state.jsonc <<EOF
+// Translation State — $PROJECT_NAME
+{
+  "project": "$PROJECT_NAME",
+  "src_lang": "$SOURCE_LANG",
+  "dst_lang": "rust",
+  "source_path": "$SOURCE_PATH",
+  "target_path": "$TARGET_PATH",
+  "started_at": "$TODAY",
+  "overall_parity": 0.0,
+  "current_wave": null,
+  "waves": {},
+  "modules": {},
+  "blockers": [],
+  "exclusions": [],
+  "session_history": []
+}
+EOF
 
 # decisions.md
-sed -e "s/\[PROJECT_NAME\]/$PROJECT_NAME/g" \
-    "$TEMPLATE_DIR/decisions.template.md" > .opencode/decisions.md
+cat > .opencode/decisions.md <<EOF
+# Translation Decisions — $PROJECT_NAME
+
+Record non-trivial translation decisions here.
+
+## Format
+
+## D-XXX: Title
+- Date: YYYY-MM-DD
+- Context: why the decision is needed
+- Options: alternatives considered
+- Decision: selected option
+- Reason: why this option was selected
+- Consequences: impact on translation and verification
+
+## Project Decisions
+
+_Append decisions during translation._
+EOF
 
 # acceptance-plan.yaml (Rule 14: T0 必填)
-sed -e "s|../path/to/source|$SOURCE_PATH|g" \
-    -e "s|<dir1>|src|g" \
-    -e "s|<dir2>|# (add more as needed)|g" \
-    "$TEMPLATE_DIR/acceptance-plan.yaml.template" > acceptance-plan.yaml
+cat > acceptance-plan.yaml <<EOF
+scope:
+  source_project: "$SOURCE_PATH"
+  target_project: "./"
+  in:
+    - "src"
+  out:
+    - "vendor/**"
+    - "**/*_generated.*"
+
+verification:
+  oracle_primary: run-source
+  oracle_fallback: static-codegraph
+  forbidden:
+    - ai-derived-expected-values
+    - hardcoded-string-literals-in-assert
+  source_runnable: true
+  source_test_coverage_pct: 30
+
+dimensions:
+  api_compat:    { weight: 0.30, target: 1.00 }
+  behavior:      { weight: 0.40, target: 0.95 }
+  perf:          { weight: 0.10, target: 0.80 }
+  test_coverage: { weight: 0.10, target: 0.60 }
+  e2e_smoke:     { weight: 0.10, target: 1.00 }
+
+forbidden:
+  unwrap_in_production: true
+  todo_macros_left: 0
+  hallucination_score_max: 0.10
+  ai_derived_oracles_max: 0
+
+e2e_command: "cargo test --test e2e --release"
+
+cases:
+  - id: AC-001
+    type: smoke
+    must_pass: true
+    desc: "minimum runnable translated behavior"
+    adapter: cli-tool
+    setup: { }
+    actions: [ ]
+    assert: [ ]
+
+escalate_to_human:
+  - any_must_pass_failed
+  - overall_score_below: 0.85
+  - hallucination_score_above: 0.20
+  - ai_derived_oracles_above: 0
+  - consecutive_waves_regress: 2
+EOF
 
 echo ""
 echo "⚠️  请编辑 acceptance-plan.yaml 确认验收策略后再启动翻译"
 echo "    特别关注: oracle_primary / dimensions / cases"
-
-# === 链接全量技能 ===
-mkdir -p .agents/skills
-
-# 核心 skills (全部挂载)
-SKILLS_TO_LINK=(
-    shared
-    translator
-    parity-checker
-    e2e-debugger
-    status-dashboard
-    self-improving
-    anti-hallucination
-    differential-tester
-    codegraph-navigator
-)
-
-# 语言相关 skill
-if [ "$SOURCE_LANG" = "go" ]; then
-    SKILLS_TO_LINK+=(go2rust)
-elif [ "$SOURCE_LANG" = "c" ]; then
-    SKILLS_TO_LINK+=(c2rust)
-fi
-
-for SKILL in "${SKILLS_TO_LINK[@]}"; do
-    if [ -d "$TRANSPILOT_ROOT/.agents/skills/$SKILL" ]; then
-        ln -sfn "$TRANSPILOT_ROOT/.agents/skills/$SKILL" ".agents/skills/$SKILL"
-    else
-        echo "  [warn] skill '$SKILL' not found in transpilot, skipping"
-    fi
-done
 
 # === 链接脚本 ===
 mkdir -p scripts
@@ -137,7 +181,7 @@ cat > AGENTS.md << AGENTSEOF
 15. Analyze sync before Wave 1 — after project analysis, summarize findings to the user and ask scope/Oracle/E2E questions before planning the first Wave
 16. Wave writing plan first — every Wave needs .opencode/plans/wave-NNN.md with goal, requirements, atomic tasks, full test matrix, acceptance criteria, and review-agent feedback loop before implementation
 
-## Skill Usage
+## Local Commands
 | I want to... | Run |
 |---|---|
 | Review acceptance gate | \`./scripts/transpilot acceptance review\` |
@@ -148,16 +192,12 @@ cat > AGENTS.md << AGENTSEOF
 | Check progress | \`./scripts/transpilot status\` |
 | Expert progress | \`./scripts/transpilot status --expert\` |
 | Diagnose setup | \`./scripts/transpilot doctor\` |
-| Audit hallucinations | \`/anti-hallucination <wave>\` |
-| Verify parity | \`/parity-checker $PROJECT_NAME [module]\` |
-| Diff-test behavior | \`/differential-tester <wave>\` |
-| Run E2E validation | \`/e2e-validator $PROJECT_NAME\` |
 | Check index freshness | \`./scripts/check-codegraph-freshness.sh\` |
 | Check placeholders | \`./scripts/forbid-placeholders.sh src\` |
 | Check Oracle independence | \`./scripts/check-oracle-independence.sh tests\` |
 
-## Cross-Skill Contract
-All skills exchange data via \`.opencode/*.jsonc\` — schema at \`.agents/skills/shared/interfaces.md\` (v1.0).
+## State Contract
+Progress and decisions are stored under \`.opencode/\`.
 AGENTSEOF
 
 # === Cargo workspace ===

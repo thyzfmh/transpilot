@@ -1,7 +1,7 @@
 #!/bin/bash
 # Transpilot - Progress/Parity Report Generator
 # Usage: ./scripts/parity-report.sh [summary|module <name>|wave <id>|risk|full]
-# Schema: aligned with .agents/skills/shared/interfaces.md §4 (v1.0)
+# Schema: aligned with .opencode/translation-state.jsonc
 
 set -euo pipefail
 

@@ -24,7 +24,7 @@ hash_file() {
 
 require_plan() {
   if [ ! -f "$PLAN_FILE" ]; then
-    echo "ERROR: $PLAN_FILE not found. Run transpilot init first." >&2
+    echo "ERROR: $PLAN_FILE not found. Create the translation project files first." >&2
     exit 2
   fi
 }
