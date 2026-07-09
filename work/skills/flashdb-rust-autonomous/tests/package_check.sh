@@ -56,6 +56,7 @@ for file in \
   "$expected_skill_dir/templates/harness/build_check.sh" \
   "$expected_skill_dir/templates/harness/test_all.sh" \
   "$expected_skill_dir/templates/harness/unsafe_audit.sh" \
+  "$expected_skill_dir/templates/harness/c_coverage_check.py" \
   "$expected_skill_dir/templates/harness/final_verify.sh"
 do
   [ -f "$file" ] || fail "missing skill template: ${file#$ROOT/}"
@@ -65,5 +66,8 @@ for script in "$expected_skill_dir/templates/harness/"*.sh; do
   [ -x "$script" ] || fail "harness template must be executable: ${script#$ROOT/}"
   bash -n "$script" || fail "invalid harness template syntax: ${script#$ROOT/}"
 done
+
+python3 -m py_compile "$expected_skill_dir/templates/harness/c_coverage_check.py"
+rm -rf "$expected_skill_dir/templates/harness/__pycache__"
 
 echo "package_check.sh: PASS"

@@ -70,7 +70,7 @@ cp "$SKILL_DIR/templates/cargo-config.toml" "$TARGET/.cargo/config.toml"
 if [ ! -f "$TARGET/Cargo.toml" ]; then
   cp "$SKILL_DIR/templates/Cargo.toml" "$TARGET/Cargo.toml"
 fi
-cp "$SKILL_DIR/templates/harness/"*.sh "$TARGET/harness/"
+cp "$SKILL_DIR/templates/harness/"* "$TARGET/harness/"
 chmod +x "$TARGET/harness/"*.sh
 ```
 
@@ -90,6 +90,7 @@ rustflags = ["-Dwarnings"]
 - `harness/build_check.sh`
 - `harness/test_all.sh`
 - `harness/unsafe_audit.sh`
+- `harness/c_coverage_check.py`
 - `harness/final_verify.sh`
 
 `build_check.sh` must run `cargo fmt --check` when rustfmt exists and then
@@ -98,13 +99,20 @@ rustflags = ["-Dwarnings"]
 
 `test_all.sh` must run `cargo test --all-targets -- --nocapture`.
 
+`c_coverage_check.py` must extract C `TEST_RUN(...)` cases from
+`code/FlashDB/tests/fdb_kvdb_tc.c` and `code/FlashDB/tests/fdb_tsdb_tc.c`,
+then fail unless `reports/c-test-coverage.tsv` maps every C test occurrence to
+a distinct existing Rust `#[test]` function.
+
 `unsafe_audit.sh 10` must count production Rust `unsafe` keyword hits under
 `src/` and fail when the ratio is greater than or equal to 10%.
 
-`final_verify.sh` must run build, tests, unsafe audit, and a placeholder audit
-for `todo!(`, `unimplemented!(`, `panic!("TODO`, `TODO: fake`, and
-`placeholder` under `src` and `tests`. It must also fail if no production Rust
-source or no Rust tests exist, so an empty crate cannot pass.
+`final_verify.sh` must run build, tests, C coverage check, unsafe audit, a
+production `unwrap()`/`expect()` audit, and a placeholder audit for `todo!(`,
+`unimplemented!(`, `panic!("TODO`, `TODO: fake`, and `placeholder` under `src`
+and `tests`. It must ignore comments during placeholder scanning and must fail
+if no production Rust source or no Rust tests exist, so an empty crate cannot
+pass.
 
 ## Phase 1: Source Design
 
@@ -141,6 +149,8 @@ probes, the next action must write or update:
 
 - `code/flashDB_rust/reports/source-inventory.md`
 - `code/flashDB_rust/reports/layout-probe.md`
+- `code/flashDB_rust/reports/c-test-coverage-required.tsv`
+- `code/flashDB_rust/reports/progress.md`
 
 Record exact probed layout values there, including:
 
@@ -149,6 +159,17 @@ Record exact probed layout values there, including:
 - TSDB sector header size and offsets
 - TSDB log index size and offsets
 - C test command and pass/fail status
+
+Immediately after copying harness templates, run:
+
+```bash
+cd code/flashDB_rust
+python3 harness/c_coverage_check.py --write-required
+```
+
+Use `reports/c-test-coverage-required.tsv` as the authoritative work queue.
+The task is not complete until every required row has a distinct Rust test in
+`reports/c-test-coverage.tsv`.
 
 ## Mandatory First Slice
 
@@ -249,6 +270,7 @@ After each slice, run from `code/flashDB_rust`:
 cargo fmt
 ./harness/build_check.sh
 ./harness/test_all.sh
+python3 harness/c_coverage_check.py
 ./harness/unsafe_audit.sh 10
 ```
 
@@ -260,8 +282,15 @@ If a command fails:
 3. Patch the smallest affected code.
 4. Re-run the failed command, then re-run the full slice verification.
 
-Before moving to another behavior area, compare the C test function names in
-`code/FlashDB/tests` with Rust test names and add missing equivalents.
+Before moving to another behavior area, update `reports/c-test-coverage.tsv`
+and run `python3 harness/c_coverage_check.py`. Do not count internal layout or
+helper tests as coverage for C `TEST_RUN(...)` cases unless the Rust test name
+and evidence explicitly map to that C case.
+
+Keep progress visible for long OpenCode runs. After each behavior slice or
+every few minutes of analysis, append one line to `reports/progress.md` with
+the current C case id, Rust test name, command run, and next action. This keeps
+the run from looking idle and makes restarts deterministic.
 
 For critical behavior, add differential or oracle-backed tests when practical:
 
@@ -270,6 +299,11 @@ For critical behavior, add differential or oracle-backed tests when practical:
 - multi-sector KV movement
 - TSDB append/query/count/clean
 - TSDB reboot or reinitialization behavior
+
+The final Rust test suite must include one distinct Rust `#[test]` per C
+`TEST_RUN(...)` occurrence, including repeated C cases that exercise different
+state. Use suffixes such as `_first_pass` and `_after_mutation` for repeated
+cases.
 
 ## Phase 4: Final Gate
 

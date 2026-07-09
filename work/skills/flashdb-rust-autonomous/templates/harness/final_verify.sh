@@ -22,10 +22,12 @@ require_nonempty_glob "Rust test" "./tests/*.rs"
 
 ./harness/build_check.sh
 ./harness/test_all.sh
+python3 ./harness/c_coverage_check.py
 ./harness/unsafe_audit.sh 10
 
 python3 - <<'PY'
 import pathlib
+import re
 import sys
 
 patterns = [
@@ -37,11 +39,17 @@ patterns = [
 ]
 
 violations = []
+
+def strip_comments(text):
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+    text = re.sub(r"(?m)//.*$", "", text)
+    return text
+
 for root in [pathlib.Path("src"), pathlib.Path("tests")]:
     if not root.exists():
         continue
     for path in sorted(root.rglob("*.rs")):
-        text = path.read_text(errors="replace")
+        text = strip_comments(path.read_text(errors="replace"))
         lowered = text.lower()
         for pattern in patterns:
             haystack = lowered if pattern == "placeholder" else text
@@ -52,6 +60,19 @@ for root in [pathlib.Path("src"), pathlib.Path("tests")]:
 if violations:
     print("[final_verify] FAIL: placeholder audit failed", file=sys.stderr)
     for violation in violations:
+        print(violation, file=sys.stderr)
+    sys.exit(1)
+
+prod_violations = []
+for path in sorted(pathlib.Path("src").rglob("*.rs")):
+    text = strip_comments(path.read_text(errors="replace"))
+    for pattern in ["unwrap(", "expect("]:
+        if pattern in text:
+            prod_violations.append(f"{path}: contains {pattern}")
+
+if prod_violations:
+    print("[final_verify] FAIL: production unwrap/expect audit failed", file=sys.stderr)
+    for violation in prod_violations:
         print(violation, file=sys.stderr)
     sys.exit(1)
 PY
