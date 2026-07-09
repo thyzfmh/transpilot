@@ -59,14 +59,33 @@ code/flashDB_rust/
   reports/
 ```
 
-5. Ensure `.cargo/config.toml` denies warnings:
+5. Copy fixed target templates from this skill before writing translation code.
+   Resolve paths relative to this `SKILL.md` file:
+
+```bash
+SKILL_DIR="work/skills/flashdb-rust-autonomous"
+TARGET="code/flashDB_rust"
+mkdir -p "$TARGET/.cargo" "$TARGET/src" "$TARGET/tests" "$TARGET/harness" "$TARGET/reports"
+cp "$SKILL_DIR/templates/cargo-config.toml" "$TARGET/.cargo/config.toml"
+if [ ! -f "$TARGET/Cargo.toml" ]; then
+  cp "$SKILL_DIR/templates/Cargo.toml" "$TARGET/Cargo.toml"
+fi
+cp "$SKILL_DIR/templates/harness/"*.sh "$TARGET/harness/"
+chmod +x "$TARGET/harness/"*.sh
+```
+
+The harness scripts are fixed verification assets. Do not rewrite them unless a
+script itself fails because of a real local environment issue; if changed,
+preserve the same checks.
+
+6. Ensure `.cargo/config.toml` denies warnings:
 
 ```toml
 [build]
 rustflags = ["-Dwarnings"]
 ```
 
-6. Ensure the harness scripts below exist and are executable:
+7. Ensure the harness scripts below exist and are executable:
 
 - `harness/build_check.sh`
 - `harness/test_all.sh`
@@ -84,7 +103,8 @@ rustflags = ["-Dwarnings"]
 
 `final_verify.sh` must run build, tests, unsafe audit, and a placeholder audit
 for `todo!(`, `unimplemented!(`, `panic!("TODO`, `TODO: fake`, and
-`placeholder` under `src` and `tests`.
+`placeholder` under `src` and `tests`. It must also fail if no production Rust
+source or no Rust tests exist, so an empty crate cannot pass.
 
 ## Phase 1: Source Design
 

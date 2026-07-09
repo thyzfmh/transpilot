@@ -28,7 +28,9 @@ work/skills/flashdb-rust-autonomous/SKILL.md
 - Result file: `result/output.md`
 
 The skill owns the full loop: source inspection, Rust design, implementation,
-test porting, repair, final verification, and result update.
+test porting, repair, final verification, and result update. Fixed target
+harness scripts are prebuilt under the skill and copied into
+`code/flashDB_rust/harness/` during Phase 0.
 
 ## Directory Layout
 
@@ -44,6 +46,10 @@ transpilot/
 │           ├── SKILL.md
 │           ├── scripts/
 │           │   └── self_check.sh
+│           ├── templates/
+│           │   ├── Cargo.toml
+│           │   ├── cargo-config.toml
+│           │   └── harness/
 │           └── tests/
 │               └── package_check.sh
 ├── result/

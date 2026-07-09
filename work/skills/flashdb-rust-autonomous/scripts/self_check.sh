@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
 
 "$ROOT/work/skills/flashdb-rust-autonomous/tests/package_check.sh"
+bash -n "$ROOT/work/skills/flashdb-rust-autonomous/scripts/self_check.sh"
 
 VALIDATOR="/Users/tanghui/.codex/skills/.system/skill-creator/scripts/quick_validate.py"
 if [ -f "$VALIDATOR" ]; then

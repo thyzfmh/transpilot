@@ -42,6 +42,8 @@ work/skills/flashdb-rust-autonomous/SKILL.md
 - `INSTRUCTION.md` entry: PASSED
 - Skill format validation: PASSED
 - Skill package self-check: PASSED
+- Harness templates inside skill: PASSED
+- `examples` directory removed: PASSED
 - C source tests: PASSED
 - Target final verification: NOT RERUN in this packaging pass because `code/flashDB_rust` is not present in the current worktree
 - Target verification owner: `work/skills/flashdb-rust-autonomous/SKILL.md`
