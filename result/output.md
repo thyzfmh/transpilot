@@ -41,8 +41,7 @@ work/skills/flashdb-rust-autonomous/SKILL.md
 - `.agents` directory removed: PASSED
 - `INSTRUCTION.md` entry: PASSED
 - Skill format validation: PASSED
-- Root harness test: PASSED
-- Root CLI test: PASSED
+- Skill package self-check: PASSED
 - C source tests: PASSED
 - Target final verification: NOT RERUN in this packaging pass because `code/flashDB_rust` is not present in the current worktree
 - Target verification owner: `work/skills/flashdb-rust-autonomous/SKILL.md`

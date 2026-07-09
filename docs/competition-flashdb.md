@@ -17,6 +17,7 @@ work/skills/flashdb-rust-autonomous/SKILL.md
 ```
 
 `transpilot init` is not a skill and is not required for the competition run.
+Any package self-check scripts live under the skill directory.
 
 ## Fixed Contract
 

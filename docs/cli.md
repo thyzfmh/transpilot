@@ -1,10 +1,8 @@
 # CLI Notes
 
-The `scripts/transpilot` CLI remains in this source tree as a local development
-utility.
+No root CLI entry is required for the FlashDB competition package.
 
-For the FlashDB competition package, it is not the execution entry and it does
-not define a skill. Use:
+Use:
 
 ```text
 INSTRUCTION.md

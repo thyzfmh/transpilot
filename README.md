@@ -17,8 +17,7 @@ It tells OpenCode to load and execute:
 work/skills/flashdb-rust-autonomous/SKILL.md
 ```
 
-`transpilot init` is not a skill. It is an older local CLI bootstrap command in
-this source tree and is not part of the competition execution path.
+`transpilot init` is not a skill and is not part of this competition package.
 
 ## Fixed Task
 
@@ -42,13 +41,14 @@ transpilot/
 ├── work/
 │   └── skills/
 │       └── flashdb-rust-autonomous/
-│           └── SKILL.md
+│           ├── SKILL.md
+│           ├── scripts/
+│           │   └── self_check.sh
+│           └── tests/
+│               └── package_check.sh
 ├── result/
 │   └── output.md
 ├── logs/
-├── scripts/
-├── harness/
-├── tests/
 └── docs/
 ```
 
@@ -57,10 +57,7 @@ transpilot/
 The repository-level checks for this package are:
 
 ```bash
-tests/test_flashdb_competition.sh
-tests/test_transpilot_cli.sh
-python3 /Users/tanghui/.codex/skills/.system/skill-creator/scripts/quick_validate.py work/skills/flashdb-rust-autonomous
-cd code/FlashDB/tests && make test
+work/skills/flashdb-rust-autonomous/scripts/self_check.sh
 ```
 
 `code/flashDB_rust` is created and completed by the skill during the OpenCode
