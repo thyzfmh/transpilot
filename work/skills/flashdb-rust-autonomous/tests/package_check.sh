@@ -47,6 +47,8 @@ assert_contains "$skill_text" "FlashBackend"
 assert_contains "$skill_text" "final_verify.sh"
 assert_contains "$skill_text" "result/output.md"
 assert_contains "$skill_text" "templates/harness"
+assert_contains "$skill_text" "Mandatory First Slice"
+assert_contains "$skill_text" "layout-probe.md"
 
 for file in \
   "$expected_skill_dir/templates/Cargo.toml" \

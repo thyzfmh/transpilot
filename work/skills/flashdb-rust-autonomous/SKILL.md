@@ -136,6 +136,53 @@ If they pass, treat the C tests and C execution as the primary oracle. If they
 cannot run because of environment issues, use source tests, constants, and
 source code as static oracle evidence and continue.
 
+Do not keep Phase 1 findings only in chat. After running C tests or layout
+probes, the next action must write or update:
+
+- `code/flashDB_rust/reports/source-inventory.md`
+- `code/flashDB_rust/reports/layout-probe.md`
+
+Record exact probed layout values there, including:
+
+- KVDB sector header size and offsets
+- KVDB KV header size and offsets
+- TSDB sector header size and offsets
+- TSDB log index size and offsets
+- C test command and pass/fail status
+
+## Mandatory First Slice
+
+Before attempting KVDB or TSDB behavior, implement and verify one small layout
+slice. This prevents long hidden analysis and creates an early Rust checkpoint.
+
+The first slice must create:
+
+- `src/lib.rs`
+- `src/layout.rs`
+- `src/error.rs` if an error type is already needed
+- `tests/layout_oracle.rs`
+
+The slice must include source-backed tests for:
+
+- write-granularity alignment
+- little-endian `u32` read/write helpers
+- KVDB sector header size `16` and KV header size `24`
+- TSDB sector header size `32` and log index size `16`
+- selected offsets from `reports/layout-probe.md`
+
+Then immediately run:
+
+```bash
+cd code/flashDB_rust
+cargo fmt
+./harness/build_check.sh
+./harness/test_all.sh
+./harness/unsafe_audit.sh 10
+```
+
+Only after this first slice passes may the task move to backend, KVDB, TSDB, or
+larger tests.
+
 ## Phase 2: Development Rules
 
 Translate behavior, not C API shape. Prefer safe Rust ownership and explicit
