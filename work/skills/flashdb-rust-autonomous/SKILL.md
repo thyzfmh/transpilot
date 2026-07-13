@@ -23,11 +23,11 @@ Use this loop for the whole task and for every failure:
 
 ```text
 inspect source and current Rust state
-  -> choose the smallest missing behavior slice
-  -> design the Rust representation from C evidence
-  -> implement the slice
-  -> port or add source-backed Rust tests
-  -> run verification
+  -> extract C TEST_RUN queue
+  -> write C-derived Rust acceptance test for the next queue item
+  -> run the test and observe the expected failure
+  -> implement the smallest Rust behavior needed by that C-derived test
+  -> run the focused test, then full verification
   -> if anything fails, patch from the exact error and rerun
   -> repeat until final_verify.sh passes
   -> update result/output.md
@@ -40,6 +40,28 @@ translation strategy. Do not stop merely because the work is long.
 
 Only stop before success if `code/FlashDB/src` is missing or unreadable. Record
 that blocker in `result/output.md`.
+
+## C-Test-First TDD Contract
+
+Do not translate behavior first and then write Rust-shaped tests. For each
+FlashDB behavior slice, write the Rust acceptance test from the C test before
+implementing or changing the Rust logic.
+
+Required order for each C `TEST_RUN(...)` occurrence:
+
+1. Read the C test body and any helper/macros it depends on.
+2. If possible, run the C test or a focused C probe and record the oracle.
+3. Add or update one Rust `#[test]` in `tests/c_kvdb_cases.rs` or
+   `tests/c_tsdb_cases.rs`.
+4. Put the exact C case id in the Rust test body, for example
+   `fdb_kvdb_tc.c::test_fdb_kvdb_init#1`.
+5. Add a `reports/c-test-coverage.tsv` row that maps the C case id to that Rust
+   test, the acceptance test file, the C oracle, and the evidence.
+6. Run the new Rust test and let it fail for the missing behavior.
+7. Implement the smallest Rust behavior needed to make that C-derived test pass.
+
+The oracle must come from C source, C macros, C execution output, or a mechanical
+probe. Never derive expected values from the current Rust implementation.
 
 ## Phase 0: Normalize Workspace
 
@@ -102,7 +124,9 @@ rustflags = ["-Dwarnings"]
 `c_coverage_check.py` must extract C `TEST_RUN(...)` cases from
 `code/FlashDB/tests/fdb_kvdb_tc.c` and `code/FlashDB/tests/fdb_tsdb_tc.c`,
 then fail unless `reports/c-test-coverage.tsv` maps every C test occurrence to
-a distinct existing Rust `#[test]` function.
+a distinct existing Rust `#[test]` function in `tests/c_*_cases.rs`. It must
+also require an exact C case id citation inside the Rust test body, a real
+assertion, and concrete oracle/evidence text.
 
 `unsafe_audit.sh 10` must count production Rust `unsafe` keyword hits under
 `src/` and fail when the ratio is greater than or equal to 10%.
@@ -150,6 +174,8 @@ probes, the next action must write or update:
 - `code/flashDB_rust/reports/source-inventory.md`
 - `code/flashDB_rust/reports/layout-probe.md`
 - `code/flashDB_rust/reports/c-test-coverage-required.tsv`
+- `code/flashDB_rust/reports/c-test-coverage.tsv`
+- `code/flashDB_rust/reports/c-oracle-traces/`
 - `code/flashDB_rust/reports/progress.md`
 
 Record exact probed layout values there, including:
@@ -170,6 +196,18 @@ python3 harness/c_coverage_check.py --write-required
 Use `reports/c-test-coverage-required.tsv` as the authoritative work queue.
 The task is not complete until every required row has a distinct Rust test in
 `reports/c-test-coverage.tsv`.
+
+Create these acceptance files before implementing KVDB or TSDB behavior beyond
+the mandatory first layout slice:
+
+```text
+tests/c_kvdb_cases.rs
+tests/c_tsdb_cases.rs
+```
+
+Each test in those files must cite the C case id, reproduce the C setup and
+assertions, and use expected values from C evidence. Layout-only unit tests and
+helper tests do not count as C case coverage.
 
 ## Mandatory First Slice
 
@@ -284,8 +322,7 @@ If a command fails:
 
 Before moving to another behavior area, update `reports/c-test-coverage.tsv`
 and run `python3 harness/c_coverage_check.py`. Do not count internal layout or
-helper tests as coverage for C `TEST_RUN(...)` cases unless the Rust test name
-and evidence explicitly map to that C case.
+helper tests as coverage for C `TEST_RUN(...)` cases.
 
 Keep progress visible for long OpenCode runs. After each behavior slice or
 every few minutes of analysis, append one line to `reports/progress.md` with
@@ -346,16 +383,18 @@ Only after both commands pass may OpenCode answer that the work is complete.
 
 ## Optional Subagent Use
 
-Do not depend on separate subagent files. If OpenCode supports subagents, the
-main agent may dispatch internal review prompts copied from this section, but
-the main agent remains responsible for edits and final verification.
+Default to no subagents. The main agent must drive the C case queue end to end.
 
-Use these internal roles only after the main agent has enough source evidence:
+Use a subagent only for a bounded read-only review when all of these are true:
 
-- Source reviewer: check that each behavior claim cites C source or C tests.
-- Rust reviewer: check for placeholders, unsafe overuse, unwraps, and behavior
-  gaps.
-- Verification reviewer: check that `final_verify.sh`, Rust tests, and
-  `result/output.md` all prove completion.
+- the task is one named C case or one single Rust test file;
+- the time budget is 10 minutes or less;
+- the subagent is forbidden to edit files, change harness scripts, or declare
+  completion;
+- the main agent records the subagent start time, deadline, result, and whether
+  it was accepted in `reports/progress.md`;
+- the main agent independently inspects any suggested diff, runs `git diff
+  --check`, runs the focused test, and reruns the full final gate.
 
-Subagents may report findings; they must not replace the non-stop loop.
+If a subagent misses the deadline, ignore its work and continue in the main
+agent loop. A subagent result is never completion evidence.
