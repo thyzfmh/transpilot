@@ -10,6 +10,7 @@ description: Use when OpenCode is running this repository's FlashDB C-to-Rust co
 - Source: `code/FlashDB`
 - Target: `code/flashDB_rust`
 - Crate package/name: `flashdb_rust`
+- Release static library: `code/flashDB_rust/target/release/libflashdb_rust.a`
 - Scope: translate FlashDB `src/`, `inc/`, and source-backed behavior from `tests/`
 - Completion gate: `cd code/flashDB_rust && ./harness/final_verify.sh` exits 0
 - Result gate: `result/output.md` records the final pass
@@ -107,10 +108,21 @@ preserve the same checks.
 rustflags = ["-Dwarnings"]
 ```
 
-7. Ensure the harness scripts below exist and are executable:
+7. Ensure `Cargo.toml` produces both Rust test/library artifacts and a static
+   library that the original C tests can link:
+
+```toml
+[lib]
+name = "flashdb_rust"
+path = "src/lib.rs"
+crate-type = ["rlib", "staticlib"]
+```
+
+8. Ensure the harness scripts below exist and are executable:
 
 - `harness/build_check.sh`
 - `harness/test_all.sh`
+- `harness/c_link_test.sh`
 - `harness/unsafe_audit.sh`
 - `harness/c_coverage_check.py`
 - `harness/final_verify.sh`
@@ -120,6 +132,12 @@ rustflags = ["-Dwarnings"]
 `cargo check`.
 
 `test_all.sh` must run `cargo test --all-targets -- --nocapture`.
+
+`c_link_test.sh` must run `RUSTC_BOOTSTRAP=1 cargo build --release`, require
+`target/release/libflashdb_rust.a` to be non-empty, compile
+`code/FlashDB/tests/kvdb_main.c` and `code/FlashDB/tests/tsdb_main.c`, link
+them against `libflashdb_rust.a`, clean old FlashDB test data directories, and
+run `kvdb_test` and `tsdb_test`.
 
 `c_coverage_check.py` must extract C `TEST_RUN(...)` cases from
 `code/FlashDB/tests/fdb_kvdb_tc.c` and `code/FlashDB/tests/fdb_tsdb_tc.c`,
@@ -131,12 +149,12 @@ assertion, and concrete oracle/evidence text.
 `unsafe_audit.sh 10` must count production Rust `unsafe` keyword hits under
 `src/` and fail when the ratio is greater than or equal to 10%.
 
-`final_verify.sh` must run build, tests, C coverage check, unsafe audit, a
-production `unwrap()`/`expect()` audit, and a placeholder audit for `todo!(`,
-`unimplemented!(`, `panic!("TODO`, `TODO: fake`, and `placeholder` under `src`
-and `tests`. It must ignore comments during placeholder scanning and must fail
-if no production Rust source or no Rust tests exist, so an empty crate cannot
-pass.
+`final_verify.sh` must run build, tests, the C static-library link test, C
+coverage check, unsafe audit, a production `unwrap()`/`expect()` audit, and a
+placeholder audit for `todo!(`, `unimplemented!(`, `panic!("TODO`, `TODO:
+fake`, and `placeholder` under `src` and `tests`. It must ignore comments
+during placeholder scanning and must fail if no production Rust source or no
+Rust tests exist, so an empty crate cannot pass.
 
 ## Phase 1: Source Design
 
@@ -247,6 +265,11 @@ larger tests.
 Translate behavior, not C API shape. Prefer safe Rust ownership and explicit
 results over raw pointer emulation.
 
+The final Rust crate must also expose the C ABI symbols needed by the original
+FlashDB C test programs when linked through `libflashdb_rust.a`. Keep the safe
+Rust implementation as the core and put any `extern "C"` compatibility layer at
+the boundary.
+
 Mapping rules:
 
 | C pattern | Rust pattern |
@@ -310,6 +333,12 @@ cargo fmt
 ./harness/test_all.sh
 python3 harness/c_coverage_check.py
 ./harness/unsafe_audit.sh 10
+```
+
+After adding or changing the C ABI boundary, also run:
+
+```bash
+./harness/c_link_test.sh
 ```
 
 If a command fails:

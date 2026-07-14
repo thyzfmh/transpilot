@@ -39,8 +39,13 @@ assert_contains "$instruction_text" "## 4. 产物清单"
 assert_contains "$instruction_text" "work/skills/flashdb-rust-autonomous/SKILL.md"
 assert_contains "$instruction_text" "Skill 名称：flashdb-rust-autonomous"
 assert_contains "$instruction_text" "原始 C 项目"
-assert_contains "$instruction_text" "C-derived Rust acceptance tests"
+assert_contains "$instruction_text" "Rust acceptance tests"
 assert_contains "$instruction_text" "code/flashDB_rust/"
+assert_contains "$instruction_text" "RUSTC_BOOTSTRAP=1 cargo build --release"
+assert_contains "$instruction_text" "libflashdb_rust.a"
+assert_contains "$instruction_text" "gcc -o kvdb_test"
+assert_contains "$instruction_text" "gcc -o tsdb_test"
+assert_contains "$instruction_text" "24 个测试场景全部通过"
 
 if [[ "$instruction_text" == *"c-to-rust"* || "$instruction_text" == *"openspec"* || "$instruction_text" == *"superpowers"* ]]; then
   fail "INSTRUCTION.md must point directly to flashdb-rust-autonomous"
@@ -63,12 +68,18 @@ assert_contains "$skill_text" "result/output.md"
 assert_contains "$skill_text" "templates/harness"
 assert_contains "$skill_text" "Mandatory First Slice"
 assert_contains "$skill_text" "layout-probe.md"
+assert_contains "$skill_text" "libflashdb_rust.a"
+assert_contains "$skill_text" "c_link_test.sh"
+
+cargo_template="$(cat "$expected_skill_dir/templates/Cargo.toml")"
+assert_contains "$cargo_template" 'crate-type = ["rlib", "staticlib"]'
 
 for file in \
   "$expected_skill_dir/templates/Cargo.toml" \
   "$expected_skill_dir/templates/cargo-config.toml" \
   "$expected_skill_dir/templates/harness/build_check.sh" \
   "$expected_skill_dir/templates/harness/test_all.sh" \
+  "$expected_skill_dir/templates/harness/c_link_test.sh" \
   "$expected_skill_dir/templates/harness/unsafe_audit.sh" \
   "$expected_skill_dir/templates/harness/c_coverage_check.py" \
   "$expected_skill_dir/templates/harness/final_verify.sh"

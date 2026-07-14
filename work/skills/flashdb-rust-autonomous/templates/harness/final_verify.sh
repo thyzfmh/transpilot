@@ -22,6 +22,7 @@ require_nonempty_glob "Rust test" "./tests/*.rs"
 
 ./harness/build_check.sh
 ./harness/test_all.sh
+./harness/c_link_test.sh
 python3 ./harness/c_coverage_check.py
 ./harness/unsafe_audit.sh 10
 
@@ -83,6 +84,8 @@ mkdir -p reports
   echo
   echo "- Status: PASSED"
   echo "- Command: ./harness/final_verify.sh"
+  echo "- Rust static library: target/release/libflashdb_rust.a"
+  echo "- C linked tests: kvdb_test and tsdb_test passed"
   echo "- Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 } > reports/final-report.md
 

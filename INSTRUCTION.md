@@ -2,22 +2,21 @@
 
 ## 1. 作品概述
 
-本作品提供一个 OpenCode Skill，用于将 FlashDB 的 C 实现转换为 Rust
-项目。执行流程由 Skill 自动完成，包括读取原始 C 源码和测试、生成
-C-derived Rust acceptance tests、实现 Rust 行为、记录过程产物，并输出
-转换后的 Rust 项目。
+本作品将 FlashDB 的 C 实现转换为 Rust，并输出可被原始 C 测试程序链接
+的 Rust 静态库。转换流程由 OpenCode Skill 驱动，Rust 实现需要通过原始
+C 测试用例约束，而不是仅通过围绕 Rust 实现编写的自测。
 
 ## 2. 输入
 
 | 输入项 | 说明 |
 |--------|------|
-| 原始 C 项目 | 含 FlashDB C 源码、头文件和原始 C 测试用例的项目目录 |
+| 原始 C 项目 | 含 FlashDB C 源码、头文件和原始 C 测试用例（如 kvdb_main.c、tsdb_main.c）的项目目录 |
+| Rust 项目 | 转换后的 Rust 项目，含 Cargo.toml，并能产出供 C 测试链接的静态库 |
 | 执行代理 | 能读取本仓库并执行本作品 Skill 的 OpenCode 环境 |
-| 可写工作区 | 用于生成 Rust 项目、测试、报告、日志和结果摘要 |
 
 ## 3. 执行工作流
 
-### Step 1：加载作品 Skill
+### Step 0：生成或更新 Rust 项目
 
 在仓库根目录中让 OpenCode 加载并执行：
 
@@ -27,52 +26,59 @@ work/skills/flashdb-rust-autonomous/SKILL.md
 
 Skill 名称：flashdb-rust-autonomous
 
-预期输出：OpenCode 进入自动转换流程，开始读取原始 C 项目并创建或更新
-Rust 项目。
+预期输出：OpenCode 读取原始 C 项目，生成或更新转换后的 Rust 项目。
 
-本步产物：执行过程记录写入 `logs/`，中间报告写入 Rust 项目的 `reports/`
-目录。
+本步产物：转换后的 Rust 项目、转换过程报告和结果摘要。
 
-### Step 2：生成 C-derived acceptance tests
+### Step 1：编译 Rust 项目
 
-Skill 会从原始 C 测试中提取测试队列，并先生成对应的 Rust acceptance
-tests。每个 Rust acceptance test 的期望值来自 C 源码、C 宏、C 测试或 C
-运行证据，而不是来自当前 Rust 实现。
-
-预期输出：每个原始 C 测试场景都有对应的 Rust acceptance test 和覆盖记录。
-
-本步产物：Rust 测试文件、C 测试覆盖表和 oracle 证据报告。
-
-### Step 3：执行转换和修复循环
-
-Skill 会按测试队列逐项实现 Rust 行为。每个切片遵循：
-
-```text
-写入 C-derived Rust test -> 运行并观察失败 -> 实现最小 Rust 行为 -> 重新运行测试
+```bash
+cd code/flashDB_rust/
+RUSTC_BOOTSTRAP=1 cargo build --release
 ```
 
-预期输出：Rust 项目持续补齐 FlashDB KVDB、TSDB、存储布局、状态迁移、
-GC、扩容、删除、时间序列迭代等行为。
+预期产物：`code/flashDB_rust/target/release/libflashdb_rust.a`
 
-本步产物：转换后的 Rust 源码、Rust 测试、过程报告和进度记录。
+成功标志：编译无错误，静态库文件存在且非空。
 
-### Step 4：写入结果摘要
+### Step 2：编译 C 测试并链接 Rust 静态库
 
-当 Skill 完成转换流程后，更新结果摘要文件。
+```bash
+cd code/FlashDB/tests/
+gcc -c kvdb_main.c -I. -I../inc -I../src -o kvdb_main.o
+gcc -c tsdb_main.c -I. -I../inc -I../src -o tsdb_main.o
+gcc -o kvdb_test kvdb_main.o -L../../flashDB_rust/target/release -lflashdb_rust -lpthread -ldl -lm
+gcc -o tsdb_test tsdb_main.o -L../../flashDB_rust/target/release -lflashdb_rust -lpthread -ldl -lm
+```
 
-预期输出：结果摘要记录转换状态、产物位置和执行记录位置。
+预期产物：`code/FlashDB/tests/kvdb_test`、`code/FlashDB/tests/tsdb_test`
+可执行文件。
 
-本步产物：`result/output.md`。
+成功标志：C 测试程序链接无错误。
+
+### Step 3：运行 C 测试
+
+```bash
+cd code/FlashDB/tests/
+rm -rf fdb_kvdb1/ fdb_tsdb1/ storage_* fdb_tsdb1 storage_tsdb
+./kvdb_test
+./tsdb_test
+```
+
+预期输出：KVDB 和 TSDB 测试程序逐项打印测试用例执行结果。
+
+成功标志：原始 C 测试中的 24 个测试场景全部通过。
 
 ## 4. 产物清单
 
 | 产物 | 位置 | 格式 | 用途 |
 |------|------|------|------|
-| 作品 Skill | `work/skills/flashdb-rust-autonomous/SKILL.md` | Markdown | OpenCode 执行入口，定义自动转换流程 |
-| 转换后的 Rust 项目 | `code/flashDB_rust/` | Cargo 项目目录 | Scorer 读取和执行的 Rust 转换结果 |
-| Rust acceptance tests | `code/flashDB_rust/tests/` | Rust 测试源码 | 约束 Rust 行为与原始 C 测试场景一致 |
+| Rust 静态库 | `code/flashDB_rust/target/release/libflashdb_rust.a` | 静态库 | 供原始 C 测试程序链接 |
+| 转换后的 Rust 项目 | `code/flashDB_rust/` | Cargo 项目目录 | Scorer 编译 Rust 静态库的主目标 |
+| C 测试可执行文件 | `code/FlashDB/tests/kvdb_test`、`code/FlashDB/tests/tsdb_test` | 二进制 | 执行原始 C 测试场景 |
+| Rust acceptance tests | `code/flashDB_rust/tests/` | Rust 测试源码 | 用 C-derived 测试约束 Rust 行为 |
 | C 测试覆盖表 | `code/flashDB_rust/reports/c-test-coverage.tsv` | TSV | 记录 C 测试场景到 Rust acceptance test 的映射 |
 | Oracle 证据 | `code/flashDB_rust/reports/c-oracle-traces/` | 多文件 | 保存 C 源码、宏、运行输出或探针得到的期望值证据 |
-| 转换报告 | `code/flashDB_rust/reports/` | Markdown/TSV | 记录源码盘点、布局探针、进度和覆盖结果 |
-| 执行日志 | `logs/` | 多文件 | 记录 OpenCode 执行过程 |
+| 转换报告 | `code/flashDB_rust/reports/` | Markdown/TSV | 记录转换方案、源码盘点、布局探针、进度和覆盖结果 |
+| 作品 Skill | `work/skills/flashdb-rust-autonomous/SKILL.md` | Markdown | OpenCode 执行入口 |
 | 结果摘要 | `result/output.md` | Markdown | 汇总转换状态、主要产物和执行结果 |
