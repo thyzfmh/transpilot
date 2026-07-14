@@ -39,6 +39,10 @@ assert_contains "$instruction_text" "## 4. 产物清单"
 assert_contains "$instruction_text" "work/skills/flashdb-rust-autonomous/SKILL.md"
 assert_contains "$instruction_text" "Skill 名称：flashdb-rust-autonomous"
 assert_contains "$instruction_text" "原始 C 项目"
+assert_contains "$instruction_text" "读取输入并建立翻译基线"
+assert_contains "$instruction_text" "生成 Rust 项目和测试约束"
+assert_contains "$instruction_text" "按测试驱动翻译 Rust 实现"
+assert_contains "$instruction_text" "输出结果摘要"
 assert_contains "$instruction_text" "Rust acceptance tests"
 assert_contains "$instruction_text" "code/flashDB_rust/"
 assert_contains "$instruction_text" "RUSTC_BOOTSTRAP=1 cargo build --release"
@@ -52,6 +56,11 @@ if [[ "$instruction_text" == *"c-to-rust"* || "$instruction_text" == *"openspec"
 fi
 if [[ "$instruction_text" == *"不加载其它 skill"* || "$instruction_text" == *"Do not load any other skill"* ]]; then
   fail "INSTRUCTION.md should not emphasize loading no other skills"
+fi
+runner_name_upper="Open""Code"
+runner_name_lower="open""code"
+if [[ "$instruction_text" == *"$runner_name_upper"* || "$instruction_text" == *"$runner_name_lower"* ]]; then
+  fail "INSTRUCTION.md must not mention the runner by product name"
 fi
 if [[ "$instruction_text" == *"final_verify.sh"* || "$instruction_text" == *"评分规则"* || "$instruction_text" == *"完成条件"* ]]; then
   fail "INSTRUCTION.md must not include verification gates or scoring rules"
