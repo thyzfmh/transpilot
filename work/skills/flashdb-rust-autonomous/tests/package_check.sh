@@ -31,14 +31,28 @@ for dir in "$ROOT/.agent" "$ROOT/.agents" "$ROOT/config" "$ROOT/templates" "$ROO
 done
 
 instruction_text="$(cat "$ROOT/INSTRUCTION.md")"
+assert_contains "$instruction_text" "# FlashDB C-to-Rust 转换 - 参赛作品说明"
+assert_contains "$instruction_text" "## 1. 作品概述"
+assert_contains "$instruction_text" "## 2. 输入"
+assert_contains "$instruction_text" "## 3. 执行工作流"
+assert_contains "$instruction_text" "## 4. 产物清单"
 assert_contains "$instruction_text" "work/skills/flashdb-rust-autonomous/SKILL.md"
 assert_contains "$instruction_text" "Skill 名称：flashdb-rust-autonomous"
+assert_contains "$instruction_text" "原始 C 项目"
+assert_contains "$instruction_text" "C-derived Rust acceptance tests"
+assert_contains "$instruction_text" "code/flashDB_rust/"
 
 if [[ "$instruction_text" == *"c-to-rust"* || "$instruction_text" == *"openspec"* || "$instruction_text" == *"superpowers"* ]]; then
   fail "INSTRUCTION.md must point directly to flashdb-rust-autonomous"
 fi
 if [[ "$instruction_text" == *"不加载其它 skill"* || "$instruction_text" == *"Do not load any other skill"* ]]; then
   fail "INSTRUCTION.md should not emphasize loading no other skills"
+fi
+if [[ "$instruction_text" == *"final_verify.sh"* || "$instruction_text" == *"评分规则"* || "$instruction_text" == *"完成条件"* ]]; then
+  fail "INSTRUCTION.md must not include verification gates or scoring rules"
+fi
+if [[ "$instruction_text" == *"源项目固定为"* || "$instruction_text" == *"Rust 目标固定"* ]]; then
+  fail "INSTRUCTION.md inputs should be conceptual, not fixed-path task rules"
 fi
 
 skill_text="$(cat "$expected_skill_file")"
