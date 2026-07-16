@@ -1,0 +1,16 @@
+{
+  "schema": "flashdb-evidence-v1",
+  "id": "final-rust-policy",
+  "command": [
+    "python3",
+    "harness/rust_policy_check.py"
+  ],
+  "cwd": "/Users/tanghui/work/transpilot/code/flashDB_rust",
+  "started_at": "2026-07-16T08:02:31.709173+00:00",
+  "finished_at": "2026-07-16T08:02:31.746518+00:00",
+  "exit_code": 0,
+  "source_hash": "7276605cce5b11f55c8533f395f9e3704bc52c1735fd16f979e1e20399b84315",
+  "target_hash": "a32dabdbf68ff40989e9e2f6f292823026f8d806a799593457d7da3b7a3116f8",
+  "log": "reports/evidence/final-rust-policy.log",
+  "log_sha256": "0b24fd97383c79a3dde3017d5cad5bdc93f769c998725b7f4ee5f00669e7481c"
+}

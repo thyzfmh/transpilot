@@ -1,0 +1,16 @@
+{
+  "schema": "flashdb-evidence-v1",
+  "id": "final-api",
+  "command": [
+    "python3",
+    "harness/api_surface_check.py"
+  ],
+  "cwd": "/Users/tanghui/work/transpilot/code/flashDB_rust",
+  "started_at": "2026-07-16T08:02:31.933750+00:00",
+  "finished_at": "2026-07-16T08:02:32.204384+00:00",
+  "exit_code": 0,
+  "source_hash": "7276605cce5b11f55c8533f395f9e3704bc52c1735fd16f979e1e20399b84315",
+  "target_hash": "a32dabdbf68ff40989e9e2f6f292823026f8d806a799593457d7da3b7a3116f8",
+  "log": "reports/evidence/final-api.log",
+  "log_sha256": "ad0340e920da670a0b5a46d934c012f1b64d3a8cd02a208201715183165fa793"
+}

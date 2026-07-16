@@ -1,0 +1,10 @@
+{
+  "case_id": "workspace",
+  "stage": "ready_for_final",
+  "last_command": "./harness/final_verify.sh",
+  "last_exit_code": 0,
+  "schema": "flashdb-checkpoint-v1",
+  "source_hash": "af38d72f7adb2fe85b3ec28eae353eb65915794c856fd6a9bdc1effdf2de5b70",
+  "target_hash": "a32dabdbf68ff40989e9e2f6f292823026f8d806a799593457d7da3b7a3116f8",
+  "updated_at": "2026-07-16T08:03:53.116438+00:00"
+}

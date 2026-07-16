@@ -7,12 +7,23 @@ import pathlib
 import re
 import sys
 
+from evidence_runner import verify_evidence
+
 TARGET = pathlib.Path.cwd()
 SOURCE = (TARGET / "../FlashDB").resolve()
 REPORTS = TARGET / "reports"
 REQUIRED = REPORTS / "c-test-coverage-required.tsv"
 COVERAGE = REPORTS / "c-test-coverage.tsv"
 SUMMARY = REPORTS / "c-test-coverage-check.md"
+FIELDS = [
+    "case_id",
+    "source_file",
+    "c_test",
+    "rust_test",
+    "rust_file",
+    "oracle",
+    "evidence",
+]
 C_TEST_FILES = [
     SOURCE / "tests/fdb_kvdb_tc.c",
     SOURCE / "tests/fdb_tsdb_tc.c",
@@ -82,26 +93,34 @@ def write_required(cases: list[dict[str, str]]) -> None:
         writer.writerows(cases)
 
 
-def read_coverage() -> list[dict[str, str]]:
+def read_coverage(optional: bool = False) -> list[dict[str, str]]:
     if not COVERAGE.is_file():
+        if optional:
+            return []
         fail(f"missing coverage map: {COVERAGE}")
     with COVERAGE.open(newline="") as fh:
         reader = csv.DictReader(fh, delimiter="\t")
-        required_fields = {
-            "case_id",
-            "source_file",
-            "c_test",
-            "rust_test",
-            "rust_file",
-            "oracle",
-            "evidence",
-        }
-        if not reader.fieldnames or not required_fields.issubset(set(reader.fieldnames)):
+        if reader.fieldnames != FIELDS:
             fail(
-                "coverage map must have columns: "
-                "case_id, source_file, c_test, rust_test, rust_file, oracle, evidence"
+                "coverage map columns must be in this order: " + ", ".join(FIELDS)
             )
         return list(reader)
+
+
+def initialize_coverage(cases: list[dict[str, str]]) -> int:
+    required_ids = {case["case_id"] for case in cases}
+    rows = [
+        row
+        for row in read_coverage(optional=True)
+        if row.get("case_id", "").strip() in required_ids
+    ]
+    REPORTS.mkdir(parents=True, exist_ok=True)
+    with COVERAGE.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=FIELDS, delimiter="\t")
+        writer.writeheader()
+        writer.writerows(rows)
+    print(f"initialized {COVERAGE}; preserved {len(rows)} current rows")
+    return 0
 
 
 def rust_name_matches(c_test: str, rust_test: str) -> bool:
@@ -126,13 +145,15 @@ def body_line_count(body: str) -> int:
     return sum(1 for line in body.splitlines() if line.strip())
 
 
-def is_concrete_text(text: str) -> bool:
+def is_concrete_oracle(text: str, case: dict[str, str]) -> bool:
     if len(text.strip()) < 24:
         return False
-    return not re.search(r"\b(TODO|fake|placeholder|name only|TBD)\b", text, re.I)
+    if re.search(r"\b(TODO|fake|placeholder|name only|TBD)\b", text, re.I):
+        return False
+    return case["source_file"] in text and case["c_test"] in text
 
 
-def verify() -> int:
+def verify(allow_missing: bool = False) -> int:
     cases = extract_c_cases()
     write_required(cases)
     rust_tests = extract_rust_tests()
@@ -142,6 +163,7 @@ def verify() -> int:
     rows_by_case: dict[str, list[dict[str, str]]] = {}
     failures: list[str] = []
     used_rust_tests: dict[str, str] = {}
+    missing_cases: list[str] = []
 
     for row in rows:
         case_id = row.get("case_id", "").strip()
@@ -150,7 +172,9 @@ def verify() -> int:
     for case_id, case in required_by_id.items():
         matches = rows_by_case.get(case_id, [])
         if not matches:
-            failures.append(f"missing coverage row for {case_id}")
+            missing_cases.append(case_id)
+            if not allow_missing:
+                failures.append(f"missing coverage row for {case_id}")
             continue
         if len(matches) > 1:
             failures.append(f"duplicate coverage rows for {case_id}")
@@ -184,10 +208,23 @@ def verify() -> int:
         if rust_test in used_rust_tests:
             failures.append(f"{case_id}: rust_test also used by {used_rust_tests[rust_test]}: {rust_test}")
         used_rust_tests[rust_test] = case_id
-        if not is_concrete_text(oracle):
-            failures.append(f"{case_id}: oracle must cite concrete C source, macro, trace, or probe evidence")
-        if not is_concrete_text(evidence):
-            failures.append(f"{case_id}: evidence must be concrete and non-placeholder")
+        if not is_concrete_oracle(oracle, case):
+            failures.append(
+                f"{case_id}: oracle must cite {case['source_file']} and {case['c_test']}"
+            )
+        references = [value.strip() for value in evidence.split(";") if value.strip()]
+        if not references:
+            failures.append(f"{case_id}: structured focused-test evidence is required")
+        for reference in references:
+            try:
+                record = verify_evidence(TARGET, reference, ("cargo",))
+                command = " ".join(record["command"])
+                if "test" not in record["command"] or rust_test not in command:
+                    raise ValueError(
+                        f"focused-test evidence command must run cargo test for {rust_test}: {reference}"
+                    )
+            except (OSError, ValueError) as exc:
+                failures.append(f"{case_id}: {exc}")
 
     extra_cases = sorted(case_id for case_id in rows_by_case if case_id and case_id not in required_by_id)
     for case_id in extra_cases:
@@ -202,7 +239,8 @@ def verify() -> int:
                 f"- Rust #[test] functions: {len(rust_tests)}",
                 f"- Coverage rows: {len(rows)}",
                 "- Acceptance file rule: `tests/c_*_cases.rs`",
-                f"- Status: {'FAILED' if failures else 'PASSED'}",
+                f"- Missing cases: {len(missing_cases)}",
+                f"- Status: {'FAILED' if failures else ('IN_PROGRESS' if missing_cases else 'PASSED')}",
                 "",
                 "## Failures",
                 "",
@@ -217,13 +255,18 @@ def verify() -> int:
         for failure in failures:
             print(f"- {failure}")
         return 1
-    print("C_COVERAGE_CHECK_PASS")
+    if allow_missing and missing_cases:
+        print(f"C_COVERAGE_PROGRESS_PASS: {len(cases) - len(missing_cases)}/{len(cases)} cases mapped")
+    else:
+        print("C_COVERAGE_CHECK_PASS")
     return 0
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--write-required", action="store_true")
+    parser.add_argument("--init", action="store_true")
+    parser.add_argument("--progress", action="store_true")
     args = parser.parse_args()
 
     cases = extract_c_cases()
@@ -232,7 +275,9 @@ def main() -> int:
         print(f"wrote {REQUIRED}")
         print(f"required C TEST_RUN occurrences: {len(cases)}")
         return 0
-    return verify()
+    if args.init:
+        return initialize_coverage(cases)
+    return verify(allow_missing=args.progress)
 
 
 if __name__ == "__main__":

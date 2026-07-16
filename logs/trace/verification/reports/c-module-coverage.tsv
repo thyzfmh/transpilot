@@ -1,0 +1,6 @@
+c_file	c_symbols	rust_files	rust_tests	evidence	status
+src/fdb.c	_fdb_init_ex;_fdb_init_finish;_fdb_deinit;_fdb_db_path	src/ffi.rs;src/lib.rs	c_test_fdb_kvdb_init_acceptance;c_test_fdb_tsdb_init_ex_acceptance	reports/evidence/final-c-link.json	PASS
+src/fdb_file.c	_fdb_file_read;_fdb_file_write;_fdb_file_erase	src/file_backend.rs	c_test_fdb_scale_up_acceptance;c_test_fdb_github_issue_249_acceptance	reports/evidence/final-interop.json	PASS
+src/fdb_kvdb.c	fdb_kvdb_init;fdb_kv_set_blob;fdb_kv_del;fdb_kv_set_default	src/kvdb.rs;src/ffi.rs	c_test_fdb_gc_acceptance;c_test_fdb_gc2_acceptance;c_test_fdb_scale_up_acceptance	reports/evidence/final-c-link.json	PASS
+src/fdb_tsdb.c	fdb_tsdb_init;fdb_tsl_append;fdb_tsl_iter_by_time;fdb_tsl_set_status	src/tsdb.rs;src/ffi.rs	c_test_fdb_tsl_iter_by_time_1_acceptance;c_test_fdb_tsl_set_status_acceptance;c_test_fdb_github_issue_249_acceptance	reports/evidence/final-c-link.json	PASS
+src/fdb_utils.c	fdb_calc_crc32;_fdb_set_status;_fdb_get_status;fdb_blob_read	src/crc.rs;src/status.rs;src/ffi.rs	status_bits_follow_flashdb_predecrement_encoding;c_test_fdb_create_kv_blob_acceptance	reports/evidence/final-c-link.json	PASS

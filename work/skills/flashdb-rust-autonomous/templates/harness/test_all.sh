@@ -4,5 +4,5 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-echo "[test_all] cargo test --all-targets -- --nocapture"
-cargo test --all-targets -- --nocapture
+echo "[test_all] cargo test --release --all-targets -- --nocapture"
+cargo test --release --all-targets -- --nocapture

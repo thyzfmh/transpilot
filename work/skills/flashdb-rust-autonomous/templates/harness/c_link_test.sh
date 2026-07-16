@@ -4,8 +4,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-echo "[c_link_test] RUSTC_BOOTSTRAP=1 cargo build --release"
-RUSTC_BOOTSTRAP=1 cargo build --release
+echo "[c_link_test] cargo build --release"
+cargo build --release
 
 LIB="$ROOT/target/release/libflashdb_rust.a"
 if [ ! -s "$LIB" ]; then
@@ -20,10 +20,7 @@ if [ ! -d "$C_TEST_DIR" ]; then
 fi
 
 CC_BIN="${CC:-gcc}"
-link_libs=(-lpthread -lm)
-if [ "$(uname -s)" != "Darwin" ]; then
-  link_libs+=(-ldl)
-fi
+link_libs=(-lpthread -ldl -lm)
 
 (
   cd "$C_TEST_DIR"

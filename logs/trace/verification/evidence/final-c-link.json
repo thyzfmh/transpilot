@@ -1,0 +1,15 @@
+{
+  "schema": "flashdb-evidence-v1",
+  "id": "final-c-link",
+  "command": [
+    "./harness/c_link_test.sh"
+  ],
+  "cwd": "/Users/tanghui/work/transpilot/code/flashDB_rust",
+  "started_at": "2026-07-16T08:02:18.821658+00:00",
+  "finished_at": "2026-07-16T08:02:30.105817+00:00",
+  "exit_code": 0,
+  "source_hash": "7276605cce5b11f55c8533f395f9e3704bc52c1735fd16f979e1e20399b84315",
+  "target_hash": "a32dabdbf68ff40989e9e2f6f292823026f8d806a799593457d7da3b7a3116f8",
+  "log": "reports/evidence/final-c-link.log",
+  "log_sha256": "ced13aa225da4d49be57cafd81df1c768d711bad00039af5b94b443b9e5fab84"
+}

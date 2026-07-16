@@ -4,79 +4,31 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-require_nonempty_glob() {
+require_files() {
   local label="$1"
-  local pattern="$2"
-  local matches=()
-  while IFS= read -r file; do
-    matches+=("$file")
-  done < <(find . -path "$pattern" -type f 2>/dev/null | sort)
-  if [ "${#matches[@]}" -eq 0 ]; then
-    echo "[final_verify] FAIL: no $label files found" >&2
+  local directory="$2"
+  if [ ! -d "$directory" ] || [ -z "$(find "$directory" -name '*.rs' -type f -size +0c -print -quit)" ]; then
+    echo "[final_verify] FAIL: no non-empty $label files found" >&2
     exit 1
   fi
 }
 
-require_nonempty_glob "production Rust source" "./src/*.rs"
-require_nonempty_glob "Rust test" "./tests/*.rs"
+require_files "production Rust source" src
+require_files "Rust test" tests
 
+python3 ./harness/source_guard.py --target "$ROOT"
+./harness/preflight.sh
 ./harness/build_check.sh
 ./harness/test_all.sh
 ./harness/c_link_test.sh
+./harness/c_interop_test.sh
 python3 ./harness/c_coverage_check.py
-./harness/unsafe_audit.sh 10
-
-python3 - <<'PY'
-import pathlib
-import re
-import sys
-
-patterns = [
-    "todo!(",
-    "unimplemented!(",
-    'panic!("TODO',
-    "TODO: fake",
-    "placeholder",
-]
-
-violations = []
-
-def strip_comments(text):
-    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
-    text = re.sub(r"(?m)//.*$", "", text)
-    return text
-
-for root in [pathlib.Path("src"), pathlib.Path("tests")]:
-    if not root.exists():
-        continue
-    for path in sorted(root.rglob("*.rs")):
-        text = strip_comments(path.read_text(errors="replace"))
-        lowered = text.lower()
-        for pattern in patterns:
-            haystack = lowered if pattern == "placeholder" else text
-            needle = pattern.lower() if pattern == "placeholder" else pattern
-            if needle in haystack:
-                violations.append(f"{path}: contains {pattern}")
-
-if violations:
-    print("[final_verify] FAIL: placeholder audit failed", file=sys.stderr)
-    for violation in violations:
-        print(violation, file=sys.stderr)
-    sys.exit(1)
-
-prod_violations = []
-for path in sorted(pathlib.Path("src").rglob("*.rs")):
-    text = strip_comments(path.read_text(errors="replace"))
-    for pattern in ["unwrap(", "expect("]:
-        if pattern in text:
-            prod_violations.append(f"{path}: contains {pattern}")
-
-if prod_violations:
-    print("[final_verify] FAIL: production unwrap/expect audit failed", file=sys.stderr)
-    for violation in prod_violations:
-        print(violation, file=sys.stderr)
-    sys.exit(1)
-PY
+python3 ./harness/api_surface_check.py
+python3 ./harness/trace_capture.py verify --target "$ROOT"
+python3 ./harness/translation_spec_check.py
+python3 ./harness/checkpoint.py verify-final
+python3 ./harness/rust_policy_check.py
+python3 ./harness/source_guard.py --target "$ROOT"
 
 mkdir -p reports
 {
@@ -84,9 +36,14 @@ mkdir -p reports
   echo
   echo "- Status: PASSED"
   echo "- Command: ./harness/final_verify.sh"
+  echo "- Configuration: POSIX file mode, KVDB+TSDB, FDB_WRITE_GRAN=1, 32-bit timestamp"
   echo "- Rust static library: target/release/libflashdb_rust.a"
-  echo "- C linked tests: kvdb_test and tsdb_test passed"
+  echo "- C linked tests: PASSED"
+  echo "- C/Rust bidirectional persistence: PASSED"
+  echo "- Public C API surface: PASSED"
+  echo "- C-to-Rust specification: PASSED"
+  echo "- Rust safety policy: PASSED"
   echo "- Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 } > reports/final-report.md
 
-echo "Final verification passed"
+echo "FINAL_VERIFY_PASS"

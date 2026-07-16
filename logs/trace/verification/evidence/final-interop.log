@@ -1,0 +1,100 @@
+    Finished `release` profile [optimized] target(s) in 0.00s
+/Users/tanghui/work/transpilot/code/flashDB_rust/../FlashDB/src/fdb_kvdb.c:397:41: warning: field precision should have type 'int', but argument has type 'size_t' (aka 'unsigned long') [-Wformat]
+  397 |         FDB_INFO("Error: Read the KV (%.*s@0x%08" PRIX32 ") CRC32 check failed!\n", name_len, kv->name, kv->addr.start);
+      |                                       ~~^~                                          ~~~~~~~~
+/Users/tanghui/work/transpilot/code/flashDB_rust/../FlashDB/inc/fdb_def.h:70:67: note: expanded from macro 'FDB_INFO'
+   70 | #define FDB_INFO(...)                  FDB_LOG_PREFIX();FDB_PRINT(__VA_ARGS__)
+      |                                                                   ^~~~~~~~~~~
+/Users/tanghui/work/transpilot/code/flashDB_rust/../FlashDB/inc/fdb_def.h:59:47: note: expanded from macro 'FDB_PRINT'
+   59 | #define FDB_PRINT(...)                 printf(__VA_ARGS__)
+      |                                               ^~~~~~~~~~~
+/Users/tanghui/work/transpilot/code/flashDB_rust/../FlashDB/src/fdb_kvdb.c:898:65: warning: unused parameter 'arg2' [-Wunused-parameter]
+  898 | static bool alloc_kv_cb(kv_sec_info_t sector, void *arg1, void *arg2)
+      |                                                                 ^
+/Users/tanghui/work/transpilot/code/flashDB_rust/../FlashDB/src/fdb_kvdb.c:1083:96: warning: format specifies type 'unsigned short' but the argument has type 'size_t' (aka 'unsigned long') [-Wformat]
+ 1083 |             FDB_INFO("Error: Alloc an KV (size %" PRIuLEAST16 ") failed after GC. KV full.\n", kv_size);
+      |             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~
+/Users/tanghui/work/transpilot/code/flashDB_rust/../FlashDB/inc/fdb_def.h:70:67: note: expanded from macro 'FDB_INFO'
+   70 | #define FDB_INFO(...)                  FDB_LOG_PREFIX();FDB_PRINT(__VA_ARGS__)
+      |                                                         ~~~~~~~~~~^~~~~~~~~~~~
+/Users/tanghui/work/transpilot/code/flashDB_rust/../FlashDB/inc/fdb_def.h:59:47: note: expanded from macro 'FDB_PRINT'
+   59 | #define FDB_PRINT(...)                 printf(__VA_ARGS__)
+      |                                               ^~~~~~~~~~~
+/Users/tanghui/work/transpilot/code/flashDB_rust/../FlashDB/src/fdb_kvdb.c:1112:59: warning: unused parameter 'arg2' [-Wunused-parameter]
+ 1112 | static bool do_gc(kv_sec_info_t sector, void *arg1, void *arg2)
+      |                                                           ^
+/Users/tanghui/work/transpilot/code/flashDB_rust/../FlashDB/src/fdb_kvdb.c:1502:57: warning: format specifies type 'unsigned int' but the argument has type 'unsigned long' [-Wformat]
+ 1502 |     FDB_PRINT("size: %" PRIu32 "/%" PRIu32 " bytes.\n", (uint32_t)using_size + ((SECTOR_NUM - FDB_GC_EMPTY_SEC_THRESHOLD) * SECTOR_HDR_DATA_SIZE),
+      |     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 1503 |             db_max_size(db) - db_sec_size(db) * FDB_GC_EMPTY_SEC_THRESHOLD);
+      |             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/tanghui/work/transpilot/code/flashDB_rust/../FlashDB/inc/fdb_def.h:59:47: note: expanded from macro 'FDB_PRINT'
+   59 | #define FDB_PRINT(...)                 printf(__VA_ARGS__)
+      |                                               ^~~~~~~~~~~
+/Users/tanghui/work/transpilot/code/flashDB_rust/../FlashDB/src/fdb_kvdb.c:1581:78: warning: unused parameter 'arg2' [-Wunused-parameter]
+ 1581 | static bool check_and_recovery_gc_cb(kv_sec_info_t sector, void *arg1, void *arg2)
+      |                                                                              ^
+/Users/tanghui/work/transpilot/code/flashDB_rust/../FlashDB/src/fdb_kvdb.c:1595:69: warning: unused parameter 'arg2' [-Wunused-parameter]
+ 1595 | static bool check_and_recovery_kv_cb(fdb_kv_t kv, void *arg1, void *arg2)
+      |                                                                     ^
+7 warnings generated.
+/Users/tanghui/work/transpilot/code/flashDB_rust/../FlashDB/src/fdb_tsdb.c:866:72: warning: unused parameter 'arg2' [-Wunused-parameter]
+  866 | static bool check_sec_hdr_cb(tsdb_sec_info_t sector, void *arg1, void *arg2)
+      |                                                                        ^
+/Users/tanghui/work/transpilot/code/flashDB_rust/../FlashDB/src/fdb_tsdb.c:893:69: warning: unused parameter 'arg2' [-Wunused-parameter]
+  893 | static bool format_all_cb(tsdb_sec_info_t sector, void *arg1, void *arg2)
+      |                                                                     ^
+2 warnings generated.
+[FlashDB][kv][(null)][(null)] Error: KV ((null)) isn't initialize OK.
+INTEROP_DRIVER_PASS
+INTEROP_DRIVER_PASS
+[FlashDB][kv][interop_kv][/Users/tanghui/work/transpilot/code/flashDB_rust/reports/interop-build/kv-c] (/Users/tanghui/work/transpilot/code/flashDB_rust/../FlashDB/src/fdb_kvdb.c:1778) The oldest addr is @0x00000000
+[FlashDB][kv][interop_kv][/Users/tanghui/work/transpilot/code/flashDB_rust/reports/interop-build/kv-c] (/Users/tanghui/work/transpilot/code/flashDB_rust/../FlashDB/src/fdb_kvdb.c:1794) KVDB size is 16384 bytes.
+[FlashDB][kv][interop_kv][/Users/tanghui/work/transpilot/code/flashDB_rust/reports/interop-build/kv-c] (/Users/tanghui/work/transpilot/code/flashDB_rust/../FlashDB/src/fdb_kvdb.c:1573) Sector header info is incorrect. Auto format this sector (0x00000000).
+[FlashDB][kv][interop_kv][/Users/tanghui/work/transpilot/code/flashDB_rust/reports/interop-build/kv-c] (/Users/tanghui/work/transpilot/code/flashDB_rust/../FlashDB/src/fdb_kvdb.c:1573) Sector header info is incorrect. Auto format this sector (0x00001000).
+[FlashDB][kv][interop_kv][/Users/tanghui/work/transpilot/code/flashDB_rust/reports/interop-build/kv-c] (/Users/tanghui/work/transpilot/code/flashDB_rust/../FlashDB/src/fdb_kvdb.c:1573) Sector header info is incorrect. Auto format this sector (0x00002000).
+[FlashDB][kv][interop_kv][/Users/tanghui/work/transpilot/code/flashDB_rust/reports/interop-build/kv-c] (/Users/tanghui/work/transpilot/code/flashDB_rust/../FlashDB/src/fdb_kvdb.c:1573) Sector header info is incorrect. Auto format this sector (0x00003000).
+[FlashDB][kv][interop_kv][/Users/tanghui/work/transpilot/code/flashDB_rust/reports/interop-build/kv-c] All sector header is incorrect. Set it to default.
+[FlashDB] FlashDB V2.2.99 is initialize success.
+[FlashDB] You can get the latest version on https://github.com/armink/FlashDB .
+greeting=interop-value
+binary=blob @0x0000005B 6bytes
+
+mode: next generation
+size: 129/12288 bytes.
+INTEROP_DRIVER_PASS
+greeting = blob @0x00000030 13bytes
+binary = blob @0x0000005B 6bytes
+
+mode: next generation
+size: 81/12288 bytes.
+INTEROP_DRIVER_PASS
+greeting = blob @0x00000030 13bytes
+binary = blob @0x0000005B 6bytes
+
+mode: next generation
+size: 81/12288 bytes.
+INTEROP_DRIVER_PASS
+[FlashDB][kv][interop_kv][/Users/tanghui/work/transpilot/code/flashDB_rust/reports/interop-build/kv-rust] (/Users/tanghui/work/transpilot/code/flashDB_rust/../FlashDB/src/fdb_kvdb.c:1778) The oldest addr is @0x00000000
+[FlashDB][kv][interop_kv][/Users/tanghui/work/transpilot/code/flashDB_rust/reports/interop-build/kv-rust] (/Users/tanghui/work/transpilot/code/flashDB_rust/../FlashDB/src/fdb_kvdb.c:1794) KVDB size is 16384 bytes.
+[FlashDB] FlashDB V2.2.99 is initialize success.
+[FlashDB] You can get the latest version on https://github.com/armink/FlashDB .
+greeting=interop-value
+binary=blob @0x0000005B 6bytes
+
+mode: next generation
+size: 129/12288 bytes.
+INTEROP_DRIVER_PASS
+[FlashDB][tsl][interop_ts][/Users/tanghui/work/transpilot/code/flashDB_rust/reports/interop-build/ts-c] Sector (0x00000000) header info is incorrect.
+[FlashDB][tsl][interop_ts][/Users/tanghui/work/transpilot/code/flashDB_rust/reports/interop-build/ts-c] All sector format finished.
+[FlashDB][tsl][interop_ts][/Users/tanghui/work/transpilot/code/flashDB_rust/reports/interop-build/ts-c] (/Users/tanghui/work/transpilot/code/flashDB_rust/../FlashDB/src/fdb_tsdb.c:1075) TSDB (interop_ts) oldest sectors is 0x00000000, current using sector is 0x00000000.
+[FlashDB] FlashDB V2.2.99 is initialize success.
+[FlashDB] You can get the latest version on https://github.com/armink/FlashDB .
+INTEROP_DRIVER_PASS
+INTEROP_DRIVER_PASS
+INTEROP_DRIVER_PASS
+[FlashDB][tsl][interop_ts][/Users/tanghui/work/transpilot/code/flashDB_rust/reports/interop-build/ts-rust] (/Users/tanghui/work/transpilot/code/flashDB_rust/../FlashDB/src/fdb_tsdb.c:1075) TSDB (interop_ts) oldest sectors is 0x00000000, current using sector is 0x00000000.
+[FlashDB] FlashDB V2.2.99 is initialize success.
+[FlashDB] You can get the latest version on https://github.com/armink/FlashDB .
+INTEROP_DRIVER_PASS
+C_INTEROP_TEST_PASS

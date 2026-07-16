@@ -1,49 +1,43 @@
-# 自验证输出
+# Execution Result
 
-本目录用于记录作品运行成功的输出信息。
+- Status: COMPLETED
+- Source: `code/FlashDB`
+- Target: `code/flashDB_rust`
+- Final command: `cd code/flashDB_rust && ./harness/final_verify.sh`
+- Final result: `FINAL_VERIFY_PASS`
+- Verified: 2026-07-16
 
-当前交付件已经整理为平台要求的目录结构：
+## Result
 
-- `/INSTRUCTION.md`
-- `/work`
-- `/work/skills/flashdb-rust-autonomous/SKILL.md`
-- `/result/output.md`
-- `/result/screenshot`
-- `/logs/interaction.md`
-- `/logs/trace`
+- Rust static library: `code/flashDB_rust/target/release/libflashdb_rust.a`
+- Rust tests: 50 passed, including 24 distinct C-derived acceptance tests
+- Original C tests linked to Rust: 24/24 passed (13 KVDB, 11 TSDB)
+- C-to-Rust and Rust-to-C persistence: KVDB and TSDB passed
+- Public C API surface: passed for 31 functions and 17 control commands
+- Linux cross-build: `x86_64-unknown-linux-musl` release static library built successfully; all 31 `fdb_*` symbols present
+- C source immutability, fixed configuration, safety policy, specification, checkpoint, and trace integrity: passed
 
-验证记录见：
+## Important Fixes
 
-- `logs/trace/self-verify.log`
+- Matched KVDB 16-byte sector headers and 24-byte KV headers, including CRC padding bytes.
+- Matched TSDB 32-byte sector headers and 16-byte log indexes.
+- Corrected one-bit flash status decoding and sector cache initialization.
+- Preserved pre-init lock callbacks and synchronized C parent database fields.
+- Released registry locks before invoking reentrant C callbacks.
+- Fixed empty-blob deletion by resolving the existing KV before status transition.
+- Added panic containment to every exported C ABI function and removed production `unwrap`/`expect` use.
+- Added GNU `nm` validation for exported symbols in the Linux evaluation environment.
 
-## 本次自验证结果
+## Verification Artifacts
 
-已将平台入口收口为一个 OpenCode Skill：
-
-```text
-work/skills/flashdb-rust-autonomous/SKILL.md
-```
-
-该 Skill 固定执行：
-
-- 源项目：`code/FlashDB`
-- Rust 目标：`code/flashDB_rust`
-- 执行方式：不中断循环翻译、修复、验证
-- 完成条件：`code/flashDB_rust/harness/final_verify.sh` 通过
-
-历史自验证记录见 `logs/trace/self-verify.log`。
-
-## 本次入口收口验证
-
-- Date: 2026-07-09
-- Skill entry: PASSED (`work/skills/flashdb-rust-autonomous/SKILL.md`)
-- Skill name in `INSTRUCTION.md`: PASSED (`flashdb-rust-autonomous`)
-- `.agents` directory removed: PASSED
-- `INSTRUCTION.md` entry: PASSED
-- Skill format validation: PASSED
-- Skill package self-check: PASSED
-- Harness templates inside skill: PASSED
-- `examples` directory removed: PASSED
-- C source tests: PASSED
-- Target final verification: NOT RERUN in this packaging pass because `code/flashDB_rust` is not present in the current worktree
-- Target verification owner: `work/skills/flashdb-rust-autonomous/SKILL.md`
+| Artifact | Path |
+|---|---|
+| Final report | `code/flashDB_rust/reports/final-report.md` |
+| C test coverage | `code/flashDB_rust/reports/c-test-coverage.tsv` |
+| C API coverage | `code/flashDB_rust/reports/c-api-coverage.tsv` |
+| Module coverage | `code/flashDB_rust/reports/c-module-coverage.tsv` |
+| Compliance map | `code/flashDB_rust/reports/c-to-rust-compliance.tsv` |
+| KVDB acceptance tests | `code/flashDB_rust/tests/c_kvdb_cases.rs` |
+| TSDB acceptance tests | `code/flashDB_rust/tests/c_tsdb_cases.rs` |
+| Interaction log | `logs/trace/llm_chat_log.json` |
+| Trace manifest | `logs/trace/trace-manifest.json` |

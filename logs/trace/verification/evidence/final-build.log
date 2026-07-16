@@ -1,0 +1,4 @@
+[build_check] cargo fmt --check
+[build_check] cargo check --all-targets
+    Checking flashdb_rust v0.1.0 (/Users/tanghui/work/transpilot/code/flashDB_rust)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.18s

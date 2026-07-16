@@ -1,115 +1,107 @@
 ---
 name: flashdb-rust-autonomous
-description: Use when OpenCode is running this repository's FlashDB C-to-Rust competition task from INSTRUCTION.md and must translate code/FlashDB into code/flashDB_rust without user interaction.
+description: Autonomously translate code/FlashDB to code/flashDB_rust with C-test-first development, source-bound evidence, C ABI compatibility, and bidirectional persistence verification.
 ---
 
 # FlashDB Rust Autonomous Translation
 
 ## Fixed Contract
 
-- Source: `code/FlashDB`
-- Target: `code/flashDB_rust`
-- Crate package/name: `flashdb_rust`
-- Release static library: `code/flashDB_rust/target/release/libflashdb_rust.a`
-- Scope: translate FlashDB `src/`, `inc/`, and source-backed behavior from `tests/`
-- Completion gate: `cd code/flashDB_rust && ./harness/final_verify.sh` exits 0
-- Result gate: `result/output.md` records the final pass
+- C source: `code/FlashDB`
+- Rust target: `code/flashDB_rust`
+- Crate and static library name: `flashdb_rust`
+- Release library: `code/flashDB_rust/target/release/libflashdb_rust.a`
+- Supported profile: POSIX file mode, KVDB and TSDB enabled,
+  `FDB_WRITE_GRAN=1`, signed 32-bit timestamp
+- Trusted completion command:
+  `work/skills/flashdb-rust-autonomous/scripts/final_verify_target.sh`
+- Result file: `result/output.md`
+- Complete AI interaction and verification trace: `logs/trace/`
 
-Do not ask the user questions. Make reasonable source-backed decisions and keep
-executing until the completion and result gates pass.
+Do not ask the user questions. Keep inspecting, testing, implementing, and
+repairing until the trusted completion command passes and the result file is
+updated.
 
-## Non-Stop Loop
+Read `references/c-to-rust-translation-spec.md` completely before changing the
+target. It is mandatory for design, implementation, testing, and verification.
+The scripts are enforcement tools, not a replacement for understanding C.
 
-Use this loop for the whole task and for every failure:
+## Trust Boundary
 
-```text
-inspect source and current Rust state
-  -> extract C TEST_RUN queue
-  -> write C-derived Rust acceptance test for the next queue item
-  -> run the test and observe the expected failure
-  -> implement the smallest Rust behavior needed by that C-derived test
-  -> run the focused test, then full verification
-  -> if anything fails, patch from the exact error and rerun
-  -> repeat until final_verify.sh passes
-  -> update result/output.md
-```
+During translation:
 
-Never end with a plan, partial translation, failing verification, TODO marker,
-or "needs user confirmation." If the same approach fails three times, change the
-approach by shrinking the slice, adding a narrower test, or replacing the
-translation strategy. Do not stop merely because the work is long.
+- do not edit files under `code/FlashDB`; compiler objects and temporary test
+  output are allowed, but C source, headers, tests, and Makefiles are immutable;
+- do not edit `INSTRUCTION.md` or anything under
+  `work/skills/flashdb-rust-autonomous`;
+- do not weaken, skip, replace, or locally patch a harness check;
+- never use the current Rust behavior as the oracle for a Rust test;
+- never claim success from a report row, process exit alone, or a worker result.
 
-Only stop before success if `code/FlashDB/src` is missing or unreadable. Record
-that blocker in `result/output.md`.
+`references/source-manifest.sha256` binds the accepted C input. The trusted
+launcher checks both the source manifest and the copied target harness before
+and after final verification.
 
-## C-Test-First TDD Contract
+## Autonomous Loop
 
-Do not translate behavior first and then write Rust-shaped tests. For each
-FlashDB behavior slice, write the Rust acceptance test from the C test before
-implementing or changing the Rust logic.
-
-Required order for each C `TEST_RUN(...)` occurrence:
-
-1. Read the C test body and any helper/macros it depends on.
-2. If possible, run the C test or a focused C probe and record the oracle.
-3. Add or update one Rust `#[test]` in `tests/c_kvdb_cases.rs` or
-   `tests/c_tsdb_cases.rs`.
-4. Put the exact C case id in the Rust test body, for example
-   `fdb_kvdb_tc.c::test_fdb_kvdb_init#1`.
-5. Add a `reports/c-test-coverage.tsv` row that maps the C case id to that Rust
-   test, the acceptance test file, the C oracle, and the evidence.
-6. Run the new Rust test and let it fail for the missing behavior.
-7. Implement the smallest Rust behavior needed to make that C-derived test pass.
-
-The oracle must come from C source, C macros, C execution output, or a mechanical
-probe. Never derive expected values from the current Rust implementation.
-
-## Phase 0: Normalize Workspace
-
-1. Verify `code/FlashDB/src` exists.
-2. Create `code/flashDB_rust` if it does not exist.
-3. If the target already exists, continue from it. Do not delete working Rust
-   code just to restart.
-4. Ensure the target has:
+Use one main-agent loop:
 
 ```text
-code/flashDB_rust/
-  .cargo/config.toml
-  Cargo.toml
-  src/
-  tests/
-  harness/
-  reports/
+preflight and restore checkpoint
+  -> inspect the next C case or public API item
+  -> record a C-derived oracle
+  -> add the Rust acceptance test first
+  -> observe the focused test fail for the missing behavior
+  -> implement the smallest source-equivalent behavior
+  -> run the focused test and progressive gates
+  -> record source-bound evidence and checkpoint
+  -> repeat until all queues are closed
+  -> freeze Rust source and rebuild final evidence
+  -> run the trusted completion command
+  -> update result/output.md and run the trusted command again
 ```
 
-5. Copy fixed target templates from this skill before writing translation code.
-   Resolve paths relative to this `SKILL.md` file:
+For a behavior failure, never stop after a fixed retry count. After three
+failures with the same approach, change the approach: reduce the slice, add a C
+probe, inspect a lower-level call path, or replace the implementation strategy.
+
+An environment blocker is different from a behavior failure. If preflight exits
+with code `2`, retry the exact blocker after one repair attempt. Only when the
+same external blocker occurs three consecutive times may execution stop. Record
+the command, three logs, and required external action in `result/output.md` with
+status `BLOCKED`. Missing tools, unreadable fixed source, unwritable workspace,
+or exhausted disk are blockers; failing builds and tests are not.
+
+## Phase 0: Install Fixed Harness
+
+From the repository root, create or resume the target and replace only its
+harness with the fixed template:
 
 ```bash
 SKILL_DIR="work/skills/flashdb-rust-autonomous"
 TARGET="code/flashDB_rust"
-mkdir -p "$TARGET/.cargo" "$TARGET/src" "$TARGET/tests" "$TARGET/harness" "$TARGET/reports"
+mkdir -p "$TARGET/.cargo" "$TARGET/src" "$TARGET/tests" "$TARGET/reports"
 cp "$SKILL_DIR/templates/cargo-config.toml" "$TARGET/.cargo/config.toml"
 if [ ! -f "$TARGET/Cargo.toml" ]; then
   cp "$SKILL_DIR/templates/Cargo.toml" "$TARGET/Cargo.toml"
 fi
-cp "$SKILL_DIR/templates/harness/"* "$TARGET/harness/"
+python3 - "$SKILL_DIR" "$TARGET" <<'PY'
+import pathlib
+import shutil
+import sys
+
+skill = pathlib.Path(sys.argv[1])
+target = pathlib.Path(sys.argv[2])
+destination = target / "harness"
+if destination.exists():
+    shutil.rmtree(destination)
+shutil.copytree(skill / "templates/harness", destination)
+PY
 chmod +x "$TARGET/harness/"*.sh
 ```
 
-The harness scripts are fixed verification assets. Do not rewrite them unless a
-script itself fails because of a real local environment issue; if changed,
-preserve the same checks.
-
-6. Ensure `.cargo/config.toml` denies warnings:
-
-```toml
-[build]
-rustflags = ["-Dwarnings"]
-```
-
-7. Ensure `Cargo.toml` produces both Rust test/library artifacts and a static
-   library that the original C tests can link:
+Do not delete valid Rust implementation work when resuming. The fixed
+`.cargo/config.toml` must deny warnings, and `Cargo.toml` must contain:
 
 ```toml
 [lib]
@@ -118,271 +110,211 @@ path = "src/lib.rs"
 crate-type = ["rlib", "staticlib"]
 ```
 
-8. Ensure the harness scripts below exist and are executable:
-
-- `harness/build_check.sh`
-- `harness/test_all.sh`
-- `harness/c_link_test.sh`
-- `harness/unsafe_audit.sh`
-- `harness/c_coverage_check.py`
-- `harness/final_verify.sh`
-
-`build_check.sh` must run `cargo fmt --check` when rustfmt exists and then
-`cargo check --all-targets`. If rustfmt is missing, warn and continue to
-`cargo check`.
-
-`test_all.sh` must run `cargo test --all-targets -- --nocapture`.
-
-`c_link_test.sh` must run `RUSTC_BOOTSTRAP=1 cargo build --release`, require
-`target/release/libflashdb_rust.a` to be non-empty, compile
-`code/FlashDB/tests/kvdb_main.c` and `code/FlashDB/tests/tsdb_main.c`, link
-them against `libflashdb_rust.a`, clean old FlashDB test data directories, and
-run `kvdb_test` and `tsdb_test`.
-
-`c_coverage_check.py` must extract C `TEST_RUN(...)` cases from
-`code/FlashDB/tests/fdb_kvdb_tc.c` and `code/FlashDB/tests/fdb_tsdb_tc.c`,
-then fail unless `reports/c-test-coverage.tsv` maps every C test occurrence to
-a distinct existing Rust `#[test]` function in `tests/c_*_cases.rs`. It must
-also require an exact C case id citation inside the Rust test body, a real
-assertion, and concrete oracle/evidence text.
-
-`unsafe_audit.sh 10` must count production Rust `unsafe` keyword hits under
-`src/` and fail when the ratio is greater than or equal to 10%.
-
-`final_verify.sh` must run build, tests, the C static-library link test, C
-coverage check, unsafe audit, a production `unwrap()`/`expect()` audit, and a
-placeholder audit for `todo!(`, `unimplemented!(`, `panic!("TODO`, `TODO:
-fake`, and `placeholder` under `src` and `tests`. It must ignore comments
-during placeholder scanning and must fail if no production Rust source or no
-Rust tests exist, so an empty crate cannot pass.
-
-## Phase 1: Source Design
-
-Create or refresh `code/flashDB_rust/reports/source-inventory.md` with:
-
-- all C source and header files under `code/FlashDB/src` and `code/FlashDB/inc`
-- all C tests under `code/FlashDB/tests`
-- source file sizes
-- module dependency notes based on `#include`
-- translation order
-
-Use this FlashDB order unless source evidence proves a different dependency:
-
-1. configuration, constants, statuses, structs, alignment macros
-2. CRC/status/write-granularity helpers from `fdb_utils.c`
-3. flash backend and file behavior from `fdb_file.c`
-4. shared init/deinit behavior from `fdb.c`
-5. KVDB behavior from `fdb_kvdb.c`
-6. TSDB behavior from `fdb_tsdb.c`
-7. Rust tests ported from `tests/fdb_kvdb_tc.c` and `tests/fdb_tsdb_tc.c`
-
-Try to run the C tests:
-
-```bash
-cd code/FlashDB/tests && make test
-```
-
-If they pass, treat the C tests and C execution as the primary oracle. If they
-cannot run because of environment issues, use source tests, constants, and
-source code as static oracle evidence and continue.
-
-Do not keep Phase 1 findings only in chat. After running C tests or layout
-probes, the next action must write or update:
-
-- `code/flashDB_rust/reports/source-inventory.md`
-- `code/flashDB_rust/reports/layout-probe.md`
-- `code/flashDB_rust/reports/c-test-coverage-required.tsv`
-- `code/flashDB_rust/reports/c-test-coverage.tsv`
-- `code/flashDB_rust/reports/c-oracle-traces/`
-- `code/flashDB_rust/reports/progress.md`
-
-Record exact probed layout values there, including:
-
-- KVDB sector header size and offsets
-- KVDB KV header size and offsets
-- TSDB sector header size and offsets
-- TSDB log index size and offsets
-- C test command and pass/fail status
-
-Immediately after copying harness templates, run:
+Initialize and validate the queues:
 
 ```bash
 cd code/flashDB_rust
-python3 harness/c_coverage_check.py --write-required
+python3 harness/source_guard.py --target .
+./harness/preflight.sh
+python3 harness/checkpoint.py init
+python3 harness/c_coverage_check.py --init
+python3 harness/api_surface_check.py --init
+python3 harness/translation_spec_check.py --init
+python3 harness/c_coverage_check.py --progress
+python3 harness/api_surface_check.py --progress
+python3 harness/translation_spec_check.py --progress
 ```
 
-Use `reports/c-test-coverage-required.tsv` as the authoritative work queue.
-The task is not complete until every required row has a distinct Rust test in
-`reports/c-test-coverage.tsv`.
+The three `--init` commands reconcile current required rows, preserve valid
+current work, and remove stale rows. They do not turn unfinished rows into
+passes.
 
-Create these acceptance files before implementing KVDB or TSDB behavior beyond
-the mandatory first layout slice:
+## Phase 1: Source Design and C Oracle
 
-```text
-tests/c_kvdb_cases.rs
-tests/c_tsdb_cases.rs
-```
+Create or refresh these target reports from C source evidence:
 
-Each test in those files must cite the C case id, reproduce the C setup and
-assertions, and use expected values from C evidence. Layout-only unit tests and
-helper tests do not count as C case coverage.
+- `reports/source-inventory.md`: every C source/header/test, size, includes,
+  key public and static symbols, module dependencies, translation order;
+- `reports/config-profile.md`: output of `config_profile_check.py`;
+- `reports/layout-probe.md`: measured C sizes, alignments, offsets, endian and
+  write-granularity facts;
+- `reports/c-oracle-traces/`: original C test and focused C probe output;
+- `reports/progress.md`: checkpoint, current queue item, latest command, next
+  action.
 
-## Mandatory First Slice
+Use this dependency order unless source evidence proves otherwise:
 
-Before attempting KVDB or TSDB behavior, implement and verify one small layout
-slice. This prevents long hidden analysis and creates an early Rust checkpoint.
+1. configuration, types, constants, status tables, alignment, layout;
+2. `fdb_utils.c` CRC and low-level helpers;
+3. `fdb_file.c` POSIX storage backend;
+4. `fdb.c` shared initialization/deinitialization;
+5. `fdb_kvdb.c` KV state machine and recovery;
+6. `fdb_tsdb.c` time-series state machine and recovery;
+7. C ABI, controls, callbacks, iteration, output, and all C test cases.
 
-The first slice must create:
+Run the original C suite before translating behavior and save its complete
+output as an oracle trace. If the original suite cannot run, build a focused C
+probe for the affected behavior and save its source, compile command, and
+output. A static oracle must cite the exact C file, function, branch, macro, and
+expected value.
 
-- `src/lib.rs`
-- `src/layout.rs`
-- `src/error.rs` if an error type is already needed
-- `tests/layout_oracle.rs`
+The required work queues are:
 
-The slice must include source-backed tests for:
+- `reports/c-test-coverage-required.tsv`: every `TEST_RUN(...)` occurrence;
+- `reports/c-api-required.tsv`: every public function and KVDB/TSDB control;
+- `reports/c-module-coverage.tsv`: every C source module;
+- `reports/c-to-rust-compliance.tsv`: every Chinese specification rule.
 
-- write-granularity alignment
-- little-endian `u32` read/write helpers
-- KVDB sector header size `16` and KV header size `24`
-- TSDB sector header size `32` and log index size `16`
-- selected offsets from `reports/layout-probe.md`
+## Phase 2: C-Test-First Translation
 
-Then immediately run:
+For each row in `c-test-coverage-required.tsv`, in file order:
+
+1. Read the complete C test body, helpers, macros, and production call path.
+2. Record the exact case id, such as
+   `fdb_kvdb_tc.c::test_fdb_kvdb_init#1`.
+3. Run the original C case or focused probe where needed.
+4. Add one distinct Rust `#[test]` under `tests/c_kvdb_cases.rs` or
+   `tests/c_tsdb_cases.rs` before changing production Rust.
+5. Put the exact C case id inside the test body and reproduce C setup,
+   operation order, assertions, restart context, and expected values.
+6. Run the focused Rust test and confirm it fails for the missing behavior.
+7. Implement the smallest equivalent behavior in the safe Rust core and narrow
+   FFI boundary.
+8. Run the focused test successfully through `evidence_runner.py`.
+9. Add its `reports/evidence/*.json` path to the coverage row and update the
+   checkpoint.
+
+Example successful focused-test evidence:
 
 ```bash
-cd code/flashDB_rust
-cargo fmt
-./harness/build_check.sh
-./harness/test_all.sh
-./harness/unsafe_audit.sh 10
+python3 harness/evidence_runner.py run \
+  --id ccase-kvdb-init-1 -- \
+  cargo test --release test_fdb_kvdb_init_first_pass -- --exact --nocapture
 ```
 
-Only after this first slice passes may the task move to backend, KVDB, TSDB, or
-larger tests.
+The coverage row's `oracle` must name the exact C test file and function. Its
+`evidence` must reference successful structured evidence for that exact Rust
+test. Repeated C cases require distinct Rust tests and distinct evidence.
 
-## Phase 2: Development Rules
-
-Translate behavior, not C API shape. Prefer safe Rust ownership and explicit
-results over raw pointer emulation.
-
-The final Rust crate must also expose the C ABI symbols needed by the original
-FlashDB C test programs when linked through `libflashdb_rust.a`. Keep the safe
-Rust implementation as the core and put any `extern "C"` compatibility layer at
-the boundary.
-
-Mapping rules:
-
-| C pattern | Rust pattern |
-|---|---|
-| `#define` constants | `pub const` |
-| status enums/macros | Rust enums plus conversion helpers |
-| owned buffers | `Vec<u8>` |
-| borrowed buffers | `&[u8]` / `&mut [u8]` |
-| nullable references | `Option<&T>` / `Option<&mut T>` |
-| flash storage callbacks | trait methods |
-| `void *` control arguments | typed Rust enums |
-| global test counters | `thread_local!` with `Cell` |
-
-C-to-Rust tactics for FlashDB:
-
-- Model flash as a `FlashBackend` trait. Keep KVDB/TSDB generic over the backend
-  so memory and POSIX-file storage share the same behavior tests.
-- Treat on-flash metadata as byte layout, not Rust struct layout. Use explicit
-  little-endian read/write helpers for magic words, CRCs, lengths, timestamps,
-  and addresses. Avoid relying on `repr(C)` unless an actual FFI boundary is
-  introduced.
-- Translate FlashDB status tables as bit-pattern helpers. Preserve the C
-  meaning of erased bytes, write granularity, status index order, and monotonic
-  state transitions.
-- Keep sector/KV/TSL addresses as `u32` offsets and convert to `usize` only at
-  backend slice boundaries. Validate bounds at that boundary.
-- Replace C output-pointer APIs with return values such as `Result<T, FdbErr>`
-  or `Option<T>`, but preserve the source error behavior.
-- Translate `void *` controls into enums such as typed control arguments instead
-  of accepting untyped bytes.
-- Preserve C allocation behavior with `Vec<u8>` and fixed-size arrays. Use
-  computed aligned lengths for names, values, blobs, headers, and log bodies.
-- Make garbage collection and sector iteration state-machine driven. Do not
-  shortcut by rebuilding maps from high-level collections unless tests prove the
-  same on-flash behavior.
-- Port macros into `const fn` where values participate in layout calculations,
-  especially alignment and status-table-size formulas.
-- Use `unsafe` only where a safe replacement would change required behavior;
-  every remaining unsafe use must stay under the audit threshold.
-
-Rules that must not be violated:
-
-- No production `unwrap()`, `expect()`, `todo!()`, `unimplemented!()`, or
-  placeholder implementation.
-- No fake tests that only assert the harness starts.
-- Expected values must come from C tests, C constants/macros, C execution, or
-  mechanically computed source formulas.
-- GC and sector-size tests must compute sizes from FlashDB macros and on-flash
-  layout, not round numbers.
-- Every public behavior added in Rust must have a Rust test.
-- Preserve persistence, sector state transitions, write granularity, CRC checks,
-  KV overwrite/delete semantics, TSDB timestamp ordering, and iteration order.
-
-## Phase 3: Verification Loop
-
-After each slice, run from `code/flashDB_rust`:
+After each slice run:
 
 ```bash
 cargo fmt
 ./harness/build_check.sh
 ./harness/test_all.sh
-python3 harness/c_coverage_check.py
-./harness/unsafe_audit.sh 10
+python3 harness/c_coverage_check.py --progress
+python3 harness/api_surface_check.py --progress
+python3 harness/translation_spec_check.py --progress
+python3 harness/rust_policy_check.py
 ```
 
-After adding or changing the C ABI boundary, also run:
+After any C ABI, persistent-format, callback, control, or iterator change, also
+run:
 
 ```bash
 ./harness/c_link_test.sh
+./harness/c_interop_test.sh
 ```
 
-If a command fails:
-
-1. Read the exact error span or failing assertion.
-2. Identify whether the cause is translation logic, test oracle, API mismatch,
-   missing type mapping, or harness script behavior.
-3. Patch the smallest affected code.
-4. Re-run the failed command, then re-run the full slice verification.
-
-Before moving to another behavior area, update `reports/c-test-coverage.tsv`
-and run `python3 harness/c_coverage_check.py`. Do not count internal layout or
-helper tests as coverage for C `TEST_RUN(...)` cases.
-
-Keep progress visible for long OpenCode runs. After each behavior slice or
-every few minutes of analysis, append one line to `reports/progress.md` with
-the current C case id, Rust test name, command run, and next action. This keeps
-the run from looking idle and makes restarts deterministic.
-
-For critical behavior, add differential or oracle-backed tests when practical:
-
-- basic KV set/get/delete/default
-- KV overwrite and garbage collection
-- multi-sector KV movement
-- TSDB append/query/count/clean
-- TSDB reboot or reinitialization behavior
-
-The final Rust test suite must include one distinct Rust `#[test]` per C
-`TEST_RUN(...)` occurrence, including repeated C cases that exercise different
-state. Use suffixes such as `_first_pass` and `_after_mutation` for repeated
-cases.
-
-## Phase 4: Final Gate
-
-When all source modules and tests have Rust equivalents, run:
+Update `reports/progress.md` and record the case and last successful command:
 
 ```bash
-cd code/flashDB_rust
-./harness/final_verify.sh
+python3 harness/checkpoint.py record \
+  --case '<case-id>' --stage slice_passed \
+  --command '<focused command>' --exit-code 0
 ```
 
-If any part fails, continue the verification loop. Do not report completion.
+## Mandatory Semantic Areas
 
-After `final_verify.sh` passes, update `result/output.md` with:
+Closing the C test queue alone is insufficient. The implementation must also
+close every row in the public API, module, and specification queues.
+
+The following are mandatory:
+
+- exact persistent byte layout, status transitions, CRC, erased values,
+  padding, sector movement, GC, recovery, and restart behavior;
+- all public symbols from `inc/flashdb.h` exported by the release static
+  library with exact C signatures;
+- every KVDB/TSDB control command, including lock/unlock callbacks, getters,
+  rollover, file mode, max size, and not-formatable mode;
+- callback invocation count, ordering, early stop, user context, and lock
+  balance;
+- real behavior for integrity checking, printing, iteration, reverse
+  iteration, status updates, cleanup, and capacity calculations;
+- error-code distinctions and output-parameter behavior;
+- panic containment at every C ABI entry;
+- no `static mut`, production `unwrap`, `expect`, `panic`, unfinished macro,
+  placeholder path, or unjustified `unsafe`;
+- C-produced databases readable by Rust, Rust-produced databases readable by
+  C, and byte-identical deterministic KVDB/TSDB fixtures.
+
+`harness/c_interop_test.sh` is the fixed cross-implementation gate. It must not
+be replaced by a Rust-only round trip or by C tests whose writer and reader both
+link the Rust implementation.
+
+## Phase 3: Freeze and Rebuild Evidence
+
+Structured evidence is bound to the current C source hash and current Rust
+Cargo files, build configuration, `src/`, and `tests/` hash. Any later Rust
+source, test, or build-input change makes old evidence stale. Once all behavior
+is implemented:
+
+1. Run `cargo fmt` and stop changing Rust source/tests.
+2. Regenerate successful focused `cargo test` evidence for every C coverage
+   row.
+3. Generate final build, source guard, profile, C link, interop, and Rust policy
+   evidence with `evidence_runner.py`.
+4. Update API/module rows with the relevant C link or interop evidence.
+5. Run strict C coverage and API checks through `evidence_runner.py`.
+6. Update every compliance row with evidence whose command matches that rule.
+7. Run the strict specification check.
+
+Recommended final evidence commands:
+
+```bash
+python3 harness/evidence_runner.py run --id final-source -- python3 harness/source_guard.py --target .
+python3 harness/evidence_runner.py run --id final-profile -- python3 harness/config_profile_check.py
+python3 harness/evidence_runner.py run --id final-build -- ./harness/build_check.sh
+python3 harness/evidence_runner.py run --id final-c-link -- ./harness/c_link_test.sh
+python3 harness/evidence_runner.py run --id final-interop -- ./harness/c_interop_test.sh
+python3 harness/evidence_runner.py run --id final-rust-policy -- python3 harness/rust_policy_check.py
+python3 harness/evidence_runner.py run --id final-c-coverage -- python3 harness/c_coverage_check.py
+python3 harness/evidence_runner.py run --id final-api -- python3 harness/api_surface_check.py
+python3 harness/trace_capture.py export --target .
+python3 harness/evidence_runner.py run --id final-trace -- python3 harness/trace_capture.py verify --target .
+python3 harness/translation_spec_check.py
+```
+
+Evidence records live under `reports/evidence/`. A `PASS` ledger row without a
+valid structured record is a failure. Do not manually fabricate JSON or logs.
+Use `reports/evidence/final-trace.json` for `LOG-01`.
+
+After all strict checks pass, record readiness:
+
+```bash
+python3 harness/checkpoint.py record \
+  --case all --stage ready_for_final \
+  --command 'strict pre-final gates' --exit-code 0
+```
+
+## Phase 4: Trusted Completion
+
+Run from the repository root:
+
+```bash
+work/skills/flashdb-rust-autonomous/scripts/final_verify_target.sh
+```
+
+The trusted launcher automatically exports the latest active OpenCode session
+for this repository, without `--sanitize`, to `logs/trace/llm_chat_log.json`.
+It also snapshots the machine-generated verification JSON and raw logs under
+`logs/trace/verification/` before rerunning every code-level gate. The trace is
+an audit record only; statements in it never satisfy a gate.
+
+If any command fails, return to the exact failed queue item, repair it, freeze
+again, and regenerate stale evidence. Do not report partial completion.
+
+After the trusted command passes, update `result/output.md`:
 
 ```markdown
 ## Execution Result
@@ -390,40 +322,29 @@ After `final_verify.sh` passes, update `result/output.md` with:
 - Status: COMPLETED
 - Source: code/FlashDB (C)
 - Target: code/flashDB_rust (Rust)
-- Final verification: PASSED
+- Supported profile: POSIX file mode, KVDB+TSDB, FDB_WRITE_GRAN=1, 32-bit timestamp
+- Trusted final verification: PASSED
 - Date: <current date>
 
-### Translation Summary
-- Modules translated: <list>
-- Rust tests: <number and pass count>
-- C tests: <passed / not run with reason>
-- Unsafe ratio: <value>
+### Verification Summary
+- C-derived Rust cases: <passed>/<required>
+- Public C API items: <passed>/<required>
+- Original C-linked tests: PASSED
+- C/Rust bidirectional persistence: PASSED
+- Rust safety policy: PASSED
 - Placeholders: NONE
 ```
 
-Then run a final readback:
+Then run the trusted command once more. Only the second pass permits a final
+success response.
 
-```bash
-test -f result/output.md
-cd code/flashDB_rust && ./harness/final_verify.sh
-```
+## Subagent Policy
 
-Only after both commands pass may OpenCode answer that the work is complete.
+Do not delegate implementation or queue ownership. The main agent must continue
+working and must remain responsible for all edits and verification.
 
-## Optional Subagent Use
-
-Default to no subagents. The main agent must drive the C case queue end to end.
-
-Use a subagent only for a bounded read-only review when all of these are true:
-
-- the task is one named C case or one single Rust test file;
-- the time budget is 10 minutes or less;
-- the subagent is forbidden to edit files, change harness scripts, or declare
-  completion;
-- the main agent records the subagent start time, deadline, result, and whether
-  it was accepted in `reports/progress.md`;
-- the main agent independently inspects any suggested diff, runs `git diff
-  --check`, runs the focused test, and reruns the full final gate.
-
-If a subagent misses the deadline, ignore its work and continue in the main
-agent loop. A subagent result is never completion evidence.
+A subagent may be used only for a read-only review of one named C function when
+the platform can enforce a hard timeout of at most 10 minutes. Record start,
+deadline, result, and acceptance in `reports/progress.md`. At timeout, abandon
+the subagent and continue immediately. A subagent statement is never evidence
+and never completion.
