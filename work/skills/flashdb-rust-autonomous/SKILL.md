@@ -1,6 +1,6 @@
 ---
 name: flashdb-rust-autonomous
-description: Use when an execution agent is running this repository's FlashDB C-to-Rust task from INSTRUCTION.md and must translate code/FlashDB into code/flashDB_rust without user interaction.
+description: Use when OpenCode is running this repository's FlashDB C-to-Rust competition task from INSTRUCTION.md and must translate code/FlashDB into code/flashDB_rust without user interaction.
 ---
 
 # FlashDB Rust Autonomous Translation
@@ -353,7 +353,7 @@ Before moving to another behavior area, update `reports/c-test-coverage.tsv`
 and run `python3 harness/c_coverage_check.py`. Do not count internal layout or
 helper tests as coverage for C `TEST_RUN(...)` cases.
 
-Keep progress visible for long autonomous runs. After each behavior slice or
+Keep progress visible for long OpenCode runs. After each behavior slice or
 every few minutes of analysis, append one line to `reports/progress.md` with
 the current C case id, Rust test name, command run, and next action. This keeps
 the run from looking idle and makes restarts deterministic.
@@ -408,8 +408,7 @@ test -f result/output.md
 cd code/flashDB_rust && ./harness/final_verify.sh
 ```
 
-Only after both commands pass may the execution agent answer that the work is
-complete.
+Only after both commands pass may OpenCode answer that the work is complete.
 
 ## Optional Subagent Use
 
