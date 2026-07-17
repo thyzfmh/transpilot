@@ -3,45 +3,19 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
-import hashlib
 import json
-import os
 import pathlib
 import re
 import subprocess
 import sys
 from typing import Any
 
-SCHEMA = "flashdb-evidence-v1"
+from adapter import load_adapter
+from run_identity import current_identity, require_identity, sha256
+
+
+SCHEMA = "source-translation-evidence-v2"
 ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$")
-
-
-def sha256(path: pathlib.Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for block in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
-
-
-def tree_hash(paths: list[pathlib.Path], base: pathlib.Path) -> str:
-    digest = hashlib.sha256()
-    files: list[pathlib.Path] = []
-    for root in paths:
-        if root.is_file():
-            files.append(root)
-        elif root.is_dir():
-            files.extend(path for path in root.rglob("*") if path.is_file() and "target" not in path.parts)
-    for path in sorted(set(files)):
-        try:
-            relative = path.resolve().relative_to(base.resolve()).as_posix()
-        except ValueError:
-            relative = path.resolve().as_posix()
-        digest.update(relative.encode())
-        digest.update(b"\0")
-        digest.update(sha256(path).encode())
-        digest.update(b"\n")
-    return digest.hexdigest()
 
 
 def evidence_dir(target: pathlib.Path) -> pathlib.Path:
@@ -50,30 +24,21 @@ def evidence_dir(target: pathlib.Path) -> pathlib.Path:
     return path
 
 
-def current_source_hash(target: pathlib.Path) -> str:
-    source = (target / "../FlashDB").resolve()
-    files = [
-        path
-        for root in [source / "inc", source / "src", source / "tests"]
-        if root.is_dir()
-        for path in root.rglob("*")
-        if path.is_file() and (path.suffix in {".c", ".h"} or path.name == "Makefile")
-    ]
-    return tree_hash(files, target.parent.parent)
-
-
-def current_target_hash(target: pathlib.Path) -> str:
-    return tree_hash(
-        [
-            target / "Cargo.toml",
-            target / "Cargo.lock",
-            target / "build.rs",
-            target / ".cargo/config.toml",
-            target / "src",
-            target / "tests",
-        ],
-        target,
-    )
+def requirements(target: pathlib.Path) -> dict[str, list[str]]:
+    raw = load_adapter(target).get("required_evidence")
+    if not isinstance(raw, dict) or not raw:
+        raise ValueError("adapter required_evidence is missing")
+    result: dict[str, list[str]] = {}
+    for evidence_id, command in raw.items():
+        if (
+            not isinstance(evidence_id, str)
+            or not isinstance(command, list)
+            or not command
+            or not all(isinstance(part, str) for part in command)
+        ):
+            raise ValueError("adapter required_evidence entry is invalid")
+        result[evidence_id] = command
+    return result
 
 
 def run_evidence(target: pathlib.Path, evidence_id: str, command: list[str]) -> int:
@@ -81,29 +46,50 @@ def run_evidence(target: pathlib.Path, evidence_id: str, command: list[str]) -> 
         raise ValueError(f"invalid evidence id: {evidence_id}")
     if not command:
         raise ValueError("evidence command is empty")
+    expected = requirements(target).get(evidence_id)
+    if expected is None:
+        raise ValueError(f"evidence id is not required by the adapter: {evidence_id}")
+    if command != expected:
+        raise ValueError(
+            f"evidence command mismatch for {evidence_id}: expected {expected}, got {command}"
+        )
 
-    inputs = current_source_hash(target)
+    identity_before = current_identity(target, require_artifact=False)
     out_dir = evidence_dir(target)
     log_path = out_dir / f"{evidence_id}.log"
     json_path = out_dir / f"{evidence_id}.json"
     started = dt.datetime.now(dt.timezone.utc).isoformat()
 
+    timeout = int(load_adapter(target).get("runtime_timeout_seconds", 180))
     with log_path.open("w") as log:
-        process = subprocess.Popen(
-            command,
-            cwd=target,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            env=os.environ.copy(),
-        )
-        assert process.stdout is not None
-        for line in process.stdout:
-            sys.stdout.write(line)
-            log.write(line)
-        exit_code = process.wait()
+        try:
+            process = subprocess.run(
+                command,
+                cwd=target,
+                stdout=log,
+                stderr=subprocess.STDOUT,
+                text=True,
+                check=False,
+                timeout=timeout,
+            )
+            exit_code = process.returncode
+        except subprocess.TimeoutExpired:
+            log.write(f"\nEVIDENCE_TIMEOUT after {timeout} seconds\n")
+            exit_code = 124
 
-    outputs = current_target_hash(target)
+    identity = current_identity(target, require_artifact=exit_code == 0)
+    for field in ["adapter_sha256", "source_hash", "target_hash"]:
+        if identity_before.get(field) != identity.get(field):
+            exit_code = 125
+            with log_path.open("a") as log:
+                log.write(f"\nEVIDENCE_INPUT_MUTATION: {field} changed while command ran\n")
+    if (
+        evidence_id != "final-build"
+        and identity_before.get("artifact") != identity.get("artifact")
+    ):
+        exit_code = 125
+        with log_path.open("a") as log:
+            log.write("\nEVIDENCE_INPUT_MUTATION: target artifact changed while command ran\n")
     record = {
         "schema": SCHEMA,
         "id": evidence_id,
@@ -112,13 +98,18 @@ def run_evidence(target: pathlib.Path, evidence_id: str, command: list[str]) -> 
         "started_at": started,
         "finished_at": dt.datetime.now(dt.timezone.utc).isoformat(),
         "exit_code": exit_code,
-        "source_hash": inputs,
-        "target_hash": outputs,
+        "timeout_seconds": timeout,
+        "identity_before": identity_before,
+        "identity": identity,
         "log": log_path.relative_to(target).as_posix(),
         "log_sha256": sha256(log_path),
     }
     json_path.write_text(json.dumps(record, ensure_ascii=False, indent=2) + "\n")
     print(f"EVIDENCE_WRITTEN: {json_path.relative_to(target)}")
+    if exit_code != 0:
+        tail = log_path.read_text(errors="replace").splitlines()[-12:]
+        for line in tail:
+            print(line)
     return exit_code
 
 
@@ -134,9 +125,15 @@ def load_evidence(target: pathlib.Path, reference: str) -> dict[str, Any]:
     data = json.loads(path.read_text())
     if data.get("schema") != SCHEMA or data.get("exit_code") != 0:
         raise ValueError(f"evidence is not a successful {SCHEMA} record: {reference}")
+    evidence_id = str(data.get("id", ""))
+    expected_command = requirements(target).get(evidence_id)
+    if expected_command is None:
+        raise ValueError(f"evidence id is not required by current adapter: {reference}")
     command = data.get("command")
-    if not isinstance(command, list) or not command or not all(isinstance(item, str) for item in command):
-        raise ValueError(f"evidence command is invalid: {reference}")
+    if command != expected_command:
+        raise ValueError(f"evidence command does not match adapter: {reference}")
+    if pathlib.Path(str(data.get("cwd", ""))).resolve() != target.resolve():
+        raise ValueError(f"evidence working directory mismatch: {reference}")
     log = (target / str(data.get("log", ""))).resolve()
     try:
         log.relative_to(evidence_root)
@@ -144,21 +141,27 @@ def load_evidence(target: pathlib.Path, reference: str) -> dict[str, Any]:
         raise ValueError(f"evidence log escapes reports/evidence: {reference}") from exc
     if not log.is_file() or sha256(log) != data.get("log_sha256"):
         raise ValueError(f"evidence log hash mismatch: {reference}")
-    for field in ["source_hash", "target_hash", "started_at", "finished_at"]:
+    for field in ["started_at", "finished_at"]:
         if not isinstance(data.get(field), str) or not data[field]:
             raise ValueError(f"evidence field missing: {field}: {reference}")
-    if data["source_hash"] != current_source_hash(target):
-        raise ValueError(f"evidence source hash is stale: {reference}")
-    if data["target_hash"] != current_target_hash(target):
-        raise ValueError(f"evidence target hash is stale: {reference}")
+    require_identity(data.get("identity"), target)
+    before = data.get("identity_before")
+    if not isinstance(before, dict):
+        raise ValueError(f"evidence pre-run identity is missing: {reference}")
+    for field in ["adapter_sha256", "source_hash", "target_hash"]:
+        if before.get(field) != data["identity"].get(field):
+            raise ValueError(f"evidence inputs changed while command ran: {reference}")
     return data
 
 
-def verify_evidence(target: pathlib.Path, reference: str, hints: tuple[str, ...] = ()) -> dict[str, Any]:
+def verify_evidence(
+    target: pathlib.Path,
+    reference: str,
+    expected_id: str | None = None,
+) -> dict[str, Any]:
     data = load_evidence(target, reference)
-    command_text = " ".join(data["command"])
-    if hints and not any(hint in command_text for hint in hints):
-        raise ValueError(f"evidence command lacks one of {hints}: {reference}")
+    if expected_id is not None and data.get("id") != expected_id:
+        raise ValueError(f"evidence id mismatch: expected {expected_id}: {reference}")
     return data
 
 

@@ -1,7 +1,8 @@
 # Transpilot FlashDB Competition Package
 
-This repository is packaged for one task: translate FlashDB from C to Rust with
-OpenCode.
+This repository configures one source-to-Rust translation task. Its execution
+Skill uses a reusable source-translation method and isolates current-project
+facts in a project adapter.
 
 ## Entry
 
@@ -11,7 +12,7 @@ Use the repository root entry file:
 INSTRUCTION.md
 ```
 
-It tells OpenCode to load and execute:
+It tells the execution agent to load and execute:
 
 ```text
 work/skills/flashdb-rust-autonomous/SKILL.md
@@ -24,13 +25,24 @@ work/skills/flashdb-rust-autonomous/SKILL.md
 - Source: `code/FlashDB`
 - Target: `code/flashDB_rust`
 - Skill name: `flashdb-rust-autonomous`
-- Final gate: `code/flashDB_rust/harness/final_verify.sh`
+- Trusted final gate: `work/skills/flashdb-rust-autonomous/scripts/final_verify_target.sh`
 - Result file: `result/output.md`
 
 The skill owns the full loop: source inspection, Rust design, implementation,
 test porting, repair, final verification, and result update. Fixed target
 harness scripts are prebuilt under the skill and copied into
 `code/flashDB_rust/harness/` during Phase 0.
+
+## Method Layers
+
+- `references/autonomous-source-translation-method.md`: project-independent
+  discovery, source-oracle, repair, checkpoint, and completion loop.
+- `references/c-to-rust-translation-spec.md`: reusable C-to-Rust constraints.
+- `references/project-adapter.md` and `harness/project-adapter.json`: current
+  source path, target artifact, native tests, headers, and commands.
+
+The source-native test total is discovered from source. It is not encoded in
+the general workflow.
 
 ## Directory Layout
 
@@ -45,6 +57,8 @@ transpilot/
 │       └── flashdb-rust-autonomous/
 │           ├── SKILL.md
 │           ├── scripts/
+│           │   ├── install_target_harness.sh
+│           │   ├── final_verify_target.sh
 │           │   └── self_check.sh
 │           ├── templates/
 │           │   ├── Cargo.toml
@@ -66,9 +80,13 @@ The repository-level checks for this package are:
 work/skills/flashdb-rust-autonomous/scripts/self_check.sh
 ```
 
-`code/flashDB_rust` is created and completed by the skill during the OpenCode
-competition run. Once present, the required final verification command is:
+`code/flashDB_rust` is created and completed by the Skill during execution.
+The trusted final verification command is run from the repository root:
 
 ```bash
-cd code/flashDB_rust && ./harness/final_verify.sh
+work/skills/flashdb-rust-autonomous/scripts/final_verify_target.sh
 ```
+
+The target-local `./harness/final_verify.sh` is an internal code-level gate.
+It does not replace trace export, result finalization, and the trusted
+completion checks performed by the command above.

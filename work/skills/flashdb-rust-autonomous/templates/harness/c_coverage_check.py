@@ -3,282 +3,225 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import pathlib
 import re
 import sys
 
-from evidence_runner import verify_evidence
+from adapter import load_adapter, require_list, source_root
+from run_identity import require_identity, sha256
+from source_acceptance import SCHEMA
+
 
 TARGET = pathlib.Path.cwd()
-SOURCE = (TARGET / "../FlashDB").resolve()
+ADAPTER = load_adapter(TARGET)
+SOURCE = source_root(TARGET, ADAPTER)
 REPORTS = TARGET / "reports"
-REQUIRED = REPORTS / "c-test-coverage-required.tsv"
-COVERAGE = REPORTS / "c-test-coverage.tsv"
-SUMMARY = REPORTS / "c-test-coverage-check.md"
-FIELDS = [
-    "case_id",
-    "source_file",
-    "c_test",
-    "rust_test",
-    "rust_file",
-    "oracle",
-    "evidence",
-]
-C_TEST_FILES = [
-    SOURCE / "tests/fdb_kvdb_tc.c",
-    SOURCE / "tests/fdb_tsdb_tc.c",
-]
+REQUIRED = REPORTS / "source-test-required.tsv"
+COVERAGE = REPORTS / "source-test-coverage.tsv"
+SUMMARY = REPORTS / "source-test-coverage-check.md"
+ACCEPTANCE = REPORTS / "source-acceptance.json"
+SUITES = require_list(ADAPTER, "native_suites")
+TEST_FILES = [SOURCE / str(suite["source_file"]) for suite in SUITES if isinstance(suite, dict)]
+PROTOCOL = ADAPTER.get("native_test_protocol")
 
 
-def fail(message: str) -> None:
-    print(f"[c_coverage_check] FAIL: {message}", file=sys.stderr)
-    raise SystemExit(1)
-
-
-def extract_c_cases() -> list[dict[str, str]]:
+def cases_from_source() -> list[dict[str, str]]:
+    if not isinstance(PROTOCOL, dict) or not isinstance(PROTOCOL.get("case_regex"), str):
+        raise ValueError("native_test_protocol.case_regex is missing")
+    case_regex = str(PROTOCOL["case_regex"])
     cases: list[dict[str, str]] = []
-    seen: dict[tuple[str, str], int] = {}
-    for path in C_TEST_FILES:
+    for path in TEST_FILES:
         if not path.is_file():
-            fail(f"missing C test source: {path}")
-        text = path.read_text(errors="replace")
-        for name in re.findall(r"TEST_RUN\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)", text):
-            key = (path.name, name)
-            seen[key] = seen.get(key, 0) + 1
-            case_id = f"{path.name}::{name}#{seen[key]}"
-            cases.append({"case_id": case_id, "source_file": path.name, "c_test": name})
+            raise ValueError(f"missing source-native test file: {path}")
+        seen: dict[str, int] = {}
+        names = re.findall(case_regex, path.read_text(errors="replace"))
+        if not all(isinstance(name, str) for name in names):
+            raise ValueError("case regex must capture exactly one test name")
+        for name in names:
+            seen[name] = seen.get(name, 0) + 1
+            cases.append(
+                {
+                    "case_id": (
+                        f"{path.relative_to(SOURCE).as_posix()}::{name}#{seen[name]}"
+                    ),
+                    "source_file": path.relative_to(SOURCE).as_posix(),
+                    "c_test": name,
+                }
+            )
     if not cases:
-        fail("no C TEST_RUN cases found")
+        raise ValueError("no source-native tests discovered")
     return cases
 
 
-def find_matching_brace(text: str, open_index: int) -> int:
-    depth = 0
-    for index in range(open_index, len(text)):
-        char = text[index]
-        if char == "{":
-            depth += 1
-        elif char == "}":
-            depth -= 1
-            if depth == 0:
-                return index
-    return len(text)
-
-
-def extract_rust_tests() -> dict[str, dict[str, str]]:
-    tests: dict[str, dict[str, str]] = {}
-    for root in [TARGET / "src", TARGET / "tests"]:
-        if not root.exists():
-            continue
-        for path in sorted(root.rglob("*.rs")):
-            text = path.read_text(errors="replace")
-            for match in re.finditer(
-                r"#\s*\[\s*(?:[A-Za-z0-9_:]+\s*)?test\s*\]\s*(?:\n\s*#\[[^\]]+\]\s*)*\n\s*fn\s+([A-Za-z_][A-Za-z0-9_]*)",
-                text,
-            ):
-                body_start = text.find("{", match.end())
-                body_end = find_matching_brace(text, body_start) if body_start >= 0 else match.end()
-                tests[match.group(1)] = {
-                    "file": path.relative_to(TARGET).as_posix(),
-                    "body": text[body_start : body_end + 1] if body_start >= 0 else "",
-                }
-    return tests
-
-
-def write_required(cases: list[dict[str, str]]) -> None:
-    REPORTS.mkdir(parents=True, exist_ok=True)
-    with REQUIRED.open("w", newline="") as fh:
-        writer = csv.DictWriter(fh, fieldnames=["case_id", "source_file", "c_test"], delimiter="\t")
-        writer.writeheader()
-        writer.writerows(cases)
-
-
-def read_coverage(optional: bool = False) -> list[dict[str, str]]:
-    if not COVERAGE.is_file():
-        if optional:
-            return []
-        fail(f"missing coverage map: {COVERAGE}")
-    with COVERAGE.open(newline="") as fh:
-        reader = csv.DictReader(fh, delimiter="\t")
-        if reader.fieldnames != FIELDS:
-            fail(
-                "coverage map columns must be in this order: " + ", ".join(FIELDS)
-            )
-        return list(reader)
-
-
-def initialize_coverage(cases: list[dict[str, str]]) -> int:
-    required_ids = {case["case_id"] for case in cases}
-    rows = [
-        row
-        for row in read_coverage(optional=True)
-        if row.get("case_id", "").strip() in required_ids
-    ]
-    REPORTS.mkdir(parents=True, exist_ok=True)
-    with COVERAGE.open("w", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=FIELDS, delimiter="\t")
+def write_tsv(path: pathlib.Path, fields: list[str], rows: list[dict[str, str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, delimiter="\t")
         writer.writeheader()
         writer.writerows(rows)
-    print(f"initialized {COVERAGE}; preserved {len(rows)} current rows")
+
+
+def initialize(cases: list[dict[str, str]]) -> int:
+    write_tsv(REQUIRED, ["case_id", "source_file", "c_test"], cases)
+    print(f"SOURCE_TEST_DISCOVERY_PASS: required={len(cases)}")
     return 0
 
 
-def rust_name_matches(c_test: str, rust_test: str) -> bool:
-    normalized = c_test.removeprefix("test_")
-    return c_test in rust_test or normalized in rust_test
+def verify(progress: bool) -> int:
+    required = cases_from_source()
+    write_tsv(REQUIRED, ["case_id", "source_file", "c_test"], required)
+    if not ACCEPTANCE.is_file():
+        if progress:
+            print(f"SOURCE_TEST_PROGRESS: passed=0 total={len(required)} acceptance=not-run")
+            return 0
+        raise ValueError(f"missing machine-generated acceptance result: {ACCEPTANCE}")
 
+    data = json.loads(ACCEPTANCE.read_text())
+    if data.get("schema") != SCHEMA:
+        raise ValueError("source acceptance schema mismatch")
+    require_identity(data.get("identity"), TARGET)
+    raw_cases = data.get("cases")
+    raw_suites = data.get("suites")
+    if not isinstance(raw_cases, list) or not all(isinstance(case, dict) for case in raw_cases):
+        raise ValueError("source acceptance cases are invalid")
+    if not isinstance(raw_suites, list) or not all(isinstance(suite, dict) for suite in raw_suites):
+        raise ValueError("source acceptance suites are invalid")
+    case_ids = [str(case.get("case_id", "")) for case in raw_cases]
+    if len(case_ids) != len(set(case_ids)) or "" in case_ids:
+        raise ValueError("source acceptance contains empty or duplicate case ids")
+    suite_names = [str(suite.get("name", "")) for suite in raw_suites]
+    if len(suite_names) != len(set(suite_names)) or "" in suite_names:
+        raise ValueError("source acceptance contains empty or duplicate suite names")
 
-def is_acceptance_file(path: str) -> bool:
-    return path.startswith("tests/c_") and path.endswith("_cases.rs")
+    configured_suites = {
+        str(suite["name"]): str(suite["source_file"])
+        for suite in SUITES
+        if isinstance(suite, dict)
+    }
+    if set(suite_names) != set(configured_suites):
+        raise ValueError("source acceptance suite set differs from the adapter")
+    suite_logs: dict[str, str] = {}
+    suite_case_totals: dict[str, int] = {}
+    for suite in raw_suites:
+        name = str(suite["name"])
+        if suite.get("source_file") != configured_suites[name]:
+            raise ValueError(f"suite source file mismatch: {name}")
+        log_relative = str(suite.get("log", ""))
+        log = (TARGET / log_relative).resolve()
+        try:
+            log.relative_to((TARGET / "reports/source-acceptance-logs").resolve())
+        except ValueError as exc:
+            raise ValueError(f"suite log escapes acceptance log directory: {name}") from exc
+        if not log.is_file() or sha256(log) != suite.get("log_sha256"):
+            raise ValueError(f"suite log hash mismatch: {name}")
+        if (
+            suite.get("exit_code") != 0
+            or suite.get("protocol_complete") is not True
+            or suite.get("protocol_errors") != []
+        ):
+            if not progress:
+                raise ValueError(f"suite did not complete successfully: {name}")
+        suite_logs[name] = log_relative
+        suite_case_totals[name] = 0
 
-
-def body_has_real_assertion(body: str) -> bool:
-    if "assert!(true)" in body.replace(" ", ""):
-        return False
-    return bool(
-        re.search(r"\b(assert|assert_eq|assert_ne)\s*!", body)
-        or re.search(r"\bmatches\s*!", body)
-    )
-
-
-def body_line_count(body: str) -> int:
-    return sum(1 for line in body.splitlines() if line.strip())
-
-
-def is_concrete_oracle(text: str, case: dict[str, str]) -> bool:
-    if len(text.strip()) < 24:
-        return False
-    if re.search(r"\b(TODO|fake|placeholder|name only|TBD)\b", text, re.I):
-        return False
-    return case["source_file"] in text and case["c_test"] in text
-
-
-def verify(allow_missing: bool = False) -> int:
-    cases = extract_c_cases()
-    write_required(cases)
-    rust_tests = extract_rust_tests()
-    rows = read_coverage()
-
-    required_by_id = {case["case_id"]: case for case in cases}
-    rows_by_case: dict[str, list[dict[str, str]]] = {}
+    actual = {str(case["case_id"]): case for case in raw_cases}
+    rows: list[dict[str, str]] = []
     failures: list[str] = []
-    used_rust_tests: dict[str, str] = {}
-    missing_cases: list[str] = []
+    passed = 0
+    suite_for_source = {source_file: name for name, source_file in configured_suites.items()}
+    for case in required:
+        result = actual.get(case["case_id"])
+        status = str(result.get("status")) if result else "NOT_RUN"
+        suite = str(result.get("suite", "")) if result else ""
+        expected_suite = suite_for_source.get(case["source_file"], "")
+        if result and (
+            result.get("source_file") != case["source_file"]
+            or result.get("name") != case["c_test"]
+            or suite != expected_suite
+        ):
+            failures.append(f"{case['case_id']}: acceptance metadata mismatch")
+        if suite in suite_case_totals:
+            suite_case_totals[suite] += 1
+        rows.append(
+            {
+                **case,
+                "suite": suite,
+                "status": status,
+                "log": suite_logs.get(suite, ""),
+            }
+        )
+        if status == "PASS":
+            passed += 1
+        else:
+            detail = str(result.get("failure", "not executed")) if result else "not executed"
+            failures.append(f"{case['case_id']}: {status}: {detail}")
 
-    for row in rows:
-        case_id = row.get("case_id", "").strip()
-        rows_by_case.setdefault(case_id, []).append(row)
-
-    for case_id, case in required_by_id.items():
-        matches = rows_by_case.get(case_id, [])
-        if not matches:
-            missing_cases.append(case_id)
-            if not allow_missing:
-                failures.append(f"missing coverage row for {case_id}")
-            continue
-        if len(matches) > 1:
-            failures.append(f"duplicate coverage rows for {case_id}")
-            continue
-        row = matches[0]
-        rust_test = row["rust_test"].strip()
-        rust_file = row["rust_file"].strip()
-        oracle = row["oracle"].strip()
-        evidence = row["evidence"].strip()
-        if not rust_test:
-            failures.append(f"{case_id}: empty rust_test")
-            continue
-        if rust_test not in rust_tests:
-            failures.append(f"{case_id}: rust_test not found in #[test] functions: {rust_test}")
-            continue
-        actual = rust_tests[rust_test]
-        if rust_file != actual["file"]:
-            failures.append(f"{case_id}: rust_file {rust_file} does not match actual location {actual['file']}")
-        if not is_acceptance_file(actual["file"]):
-            failures.append(f"{case_id}: rust_test must live in tests/c_*_cases.rs, got {actual['file']}")
-        if case_id not in actual["body"]:
-            failures.append(f"{case_id}: rust_test body must cite the exact C case id")
-        if not body_has_real_assertion(actual["body"]):
-            failures.append(f"{case_id}: rust_test must contain a real assertion")
-        if body_line_count(actual["body"]) < 8:
-            failures.append(f"{case_id}: rust_test body is too small for a C-derived acceptance case")
-        if not rust_name_matches(case["c_test"], rust_test):
-            failures.append(
-                f"{case_id}: rust_test name must include `{case['c_test']}` or its normalized form"
-            )
-        if rust_test in used_rust_tests:
-            failures.append(f"{case_id}: rust_test also used by {used_rust_tests[rust_test]}: {rust_test}")
-        used_rust_tests[rust_test] = case_id
-        if not is_concrete_oracle(oracle, case):
-            failures.append(
-                f"{case_id}: oracle must cite {case['source_file']} and {case['c_test']}"
-            )
-        references = [value.strip() for value in evidence.split(";") if value.strip()]
-        if not references:
-            failures.append(f"{case_id}: structured focused-test evidence is required")
-        for reference in references:
-            try:
-                record = verify_evidence(TARGET, reference, ("cargo",))
-                command = " ".join(record["command"])
-                if "test" not in record["command"] or rust_test not in command:
-                    raise ValueError(
-                        f"focused-test evidence command must run cargo test for {rust_test}: {reference}"
-                    )
-            except (OSError, ValueError) as exc:
-                failures.append(f"{case_id}: {exc}")
-
-    extra_cases = sorted(case_id for case_id in rows_by_case if case_id and case_id not in required_by_id)
-    for case_id in extra_cases:
-        failures.append(f"coverage row references unknown C case: {case_id}")
-
+    extra = sorted(set(actual) - {case["case_id"] for case in required})
+    failures.extend(f"unknown source test in acceptance result: {case_id}" for case_id in extra)
+    recomputed = {
+        "total": len(raw_cases),
+        "passed": sum(case.get("status") == "PASS" for case in raw_cases),
+        "failed": sum(case.get("status") == "FAIL" for case in raw_cases),
+        "not_run": sum(case.get("status") == "NOT_RUN" for case in raw_cases),
+    }
+    for field, value in recomputed.items():
+        if data.get(field) != value:
+            failures.append(f"acceptance summary mismatch: {field}")
+    for suite in raw_suites:
+        name = str(suite["name"])
+        suite_cases = [case for case in raw_cases if case.get("suite") == name]
+        if suite.get("total") != len(suite_cases):
+            failures.append(f"suite total mismatch: {name}")
+        if suite.get("passed") != sum(case.get("status") == "PASS" for case in suite_cases):
+            failures.append(f"suite passed count mismatch: {name}")
+    write_tsv(
+        COVERAGE,
+        ["case_id", "source_file", "c_test", "suite", "status", "log"],
+        rows,
+    )
     SUMMARY.write_text(
         "\n".join(
             [
-                "# C Test Coverage Check",
+                "# Source-Native Test Coverage",
                 "",
-                f"- Required C TEST_RUN occurrences: {len(cases)}",
-                f"- Rust #[test] functions: {len(rust_tests)}",
-                f"- Coverage rows: {len(rows)}",
-                "- Acceptance file rule: `tests/c_*_cases.rs`",
-                f"- Missing cases: {len(missing_cases)}",
-                f"- Status: {'FAILED' if failures else ('IN_PROGRESS' if missing_cases else 'PASSED')}",
+                f"- Passed: {passed}",
+                f"- Required: {len(required)}",
+                f"- Status: {'PASSED' if not failures else 'IN_PROGRESS'}",
                 "",
-                "## Failures",
+                "## First Failure",
                 "",
-                *(f"- {failure}" for failure in failures),
+                f"- {failures[0] if failures else 'none'}",
                 "",
             ]
         )
     )
-
-    if failures:
-        print("C_COVERAGE_CHECK_FAIL")
-        for failure in failures:
+    if failures and not progress:
+        print("SOURCE_TEST_COVERAGE_FAIL")
+        for failure in failures[:10]:
             print(f"- {failure}")
         return 1
-    if allow_missing and missing_cases:
-        print(f"C_COVERAGE_PROGRESS_PASS: {len(cases) - len(missing_cases)}/{len(cases)} cases mapped")
+    if progress:
+        print(f"SOURCE_TEST_PROGRESS: passed={passed} total={len(required)}")
     else:
-        print("C_COVERAGE_CHECK_PASS")
+        print(f"SOURCE_TEST_COVERAGE_PASS: passed={passed} total={len(required)}")
     return 0
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--write-required", action="store_true")
     parser.add_argument("--init", action="store_true")
     parser.add_argument("--progress", action="store_true")
     args = parser.parse_args()
-
-    cases = extract_c_cases()
-    write_required(cases)
-    if args.write_required:
-        print(f"wrote {REQUIRED}")
-        print(f"required C TEST_RUN occurrences: {len(cases)}")
-        return 0
+    cases = cases_from_source()
     if args.init:
-        return initialize_coverage(cases)
-    return verify(allow_missing=args.progress)
+        return initialize(cases)
+    return verify(args.progress)
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        print(f"SOURCE_TEST_COVERAGE_FAIL: {exc}", file=sys.stderr)
+        sys.exit(1)

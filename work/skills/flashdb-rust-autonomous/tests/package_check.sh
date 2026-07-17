@@ -4,11 +4,20 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
 SKILL="$ROOT/work/skills/flashdb-rust-autonomous"
 HARNESS="$SKILL/templates/harness"
+TEMP_ROOT=""
+TEMP_TARGET=""
 
 fail() {
   echo "FAIL: $*" >&2
   exit 1
 }
+
+cleanup() {
+  if [ -n "$TEMP_ROOT" ]; then
+    rm -rf "$TEMP_ROOT"
+  fi
+}
+trap cleanup EXIT
 
 assert_contains() {
   local haystack="$1"
@@ -55,20 +64,22 @@ fi
 
 skill_text="$(cat "$SKILL/SKILL.md")"
 for needle in \
+  "references/autonomous-source-translation-method.md" \
   "references/c-to-rust-translation-spec.md" \
+  "references/project-adapter.md" \
   "references/source-manifest.sha256" \
   "scripts/final_verify_target.sh" \
-  "C-Test-First Translation" \
-  "c_coverage_check.py --progress" \
-  "api_surface_check.py --progress" \
-  "translation_spec_check.py --progress" \
+  "Source-Native Test Loop" \
+  "project_discovery.py" \
+  "source-native acceptance" \
+  "source_oracle_runner.py" \
+  "checkpoint.py show" \
   "evidence_runner.py" \
   "trace_capture.py" \
-  "c_interop_test.sh" \
+  "differential_compare.py" \
   "ready_for_final" \
   "result/output.md" \
-  "POSIX file mode" \
-  "FDB_WRITE_GRAN=1"
+  "result/output.md"
 do
   assert_contains "$skill_text" "$needle"
 done
@@ -77,8 +88,12 @@ cargo_template="$(cat "$SKILL/templates/Cargo.toml")"
 assert_contains "$cargo_template" 'crate-type = ["rlib", "staticlib"]'
 
 spec_file="$SKILL/references/c-to-rust-translation-spec.md"
+method_file="$SKILL/references/autonomous-source-translation-method.md"
+adapter_file="$SKILL/references/project-adapter.md"
 manifest="$SKILL/references/source-manifest.sha256"
 [ -s "$spec_file" ] || fail "missing Chinese C-to-Rust specification"
+[ -s "$method_file" ] || fail "missing generic autonomous translation method"
+[ -s "$adapter_file" ] || fail "missing current project adapter"
 [ -s "$manifest" ] || fail "missing source hash manifest"
 spec_text="$(cat "$spec_file")"
 for rule_id in \
@@ -87,27 +102,55 @@ for rule_id in \
 do
   assert_contains "$spec_text" "$rule_id"
 done
-assert_contains "$spec_text" "必须采用 C 测试优先"
+assert_contains "$spec_text" "必须采用源测试优先"
 assert_contains "$spec_text" "公开 API 必须逐项闭合"
-assert_contains "$spec_text" "必须验证 C 与 Rust 双向持久化兼容"
-assert_contains "$spec_text" "证据必须绑定当前输入和当前实现"
-assert_contains "$spec_text" "AI 交互和验证日志必须完整留存"
+assert_contains "$spec_text" "必须验证双向兼容"
+assert_contains "$spec_text" "证据必须自动绑定当前实现"
+assert_contains "$spec_text" "交互和验证日志必须完整"
+method_text="$(cat "$method_file")"
+assert_contains "$method_text" "三层结构"
+assert_contains "$method_text" "最早真实反馈"
+assert_contains "$method_text" "断点恢复"
+assert_contains "$method_text" "测试数量和模块名必须由仓库机械发现"
+adapter_text="$(cat "$adapter_file")"
+assert_contains "$adapter_text" '源项目：`code/FlashDB`'
+assert_contains "$adapter_text" '目标项目：`code/flashDB_rust`'
+assert_contains "$adapter_text" "原测试数量和顺序必须由测试源码机械发现"
 
 required_files=(
   "$SKILL/templates/Cargo.toml"
   "$SKILL/templates/cargo-config.toml"
+  "$SKILL/references/autonomous-source-translation-method.md"
   "$SKILL/references/c-to-rust-translation-spec.md"
+  "$SKILL/references/project-adapter.md"
   "$SKILL/references/source-manifest.sha256"
+  "$SKILL/scripts/install_target_harness.sh"
   "$SKILL/scripts/final_verify_target.sh"
   "$SKILL/scripts/self_check.sh"
   "$SKILL/tests/trace_capture_test.py"
+  "$SKILL/tests/general_method_test.py"
   "$HARNESS/preflight.sh"
+  "$HARNESS/preflight.py"
+  "$HARNESS/adapter.py"
+  "$HARNESS/run_identity.py"
+  "$HARNESS/project-adapter.json"
   "$HARNESS/build_check.sh"
+  "$HARNESS/build_runner.py"
+  "$HARNESS/build_artifact_check.py"
+  "$HARNESS/target_test_runner.py"
+  "$HARNESS/final_gate_runner.py"
   "$HARNESS/test_all.sh"
   "$HARNESS/c_link_test.sh"
-  "$HARNESS/c_interop_test.sh"
+  "$HARNESS/native_test_runner.py"
+  "$HARNESS/source_oracle_runner.py"
+  "$HARNESS/project_discovery.py"
+  "$HARNESS/source_acceptance.py"
+  "$HARNESS/runtime_snapshot.py"
+  "$HARNESS/differential_compare.py"
   "$HARNESS/unsafe_audit.sh"
   "$HARNESS/final_verify.sh"
+  "$HARNESS/final_report.py"
+  "$HARNESS/completion.py"
   "$HARNESS/c_coverage_check.py"
   "$HARNESS/api_surface_check.py"
   "$HARNESS/translation_spec_check.py"
@@ -117,24 +160,39 @@ required_files=(
   "$HARNESS/checkpoint.py"
   "$HARNESS/rust_policy_check.py"
   "$HARNESS/source_guard.py"
-  "$HARNESS/interop/interop_driver.c"
 )
 for file in "${required_files[@]}"; do
   [ -s "$file" ] || fail "missing or empty skill asset: ${file#$ROOT/}"
 done
+
+if find "$SKILL" \( -type d -name __pycache__ -o -type f -name '*.pyc' \) -print -quit | grep -q .; then
+  fail "skill package contains generated Python cache"
+fi
 
 for script in "$HARNESS"/*.sh "$SKILL/scripts"/*.sh "$SKILL/tests"/*.sh; do
   [ -x "$script" ] || fail "script must be executable: ${script#$ROOT/}"
   bash -n "$script" || fail "invalid shell syntax: ${script#$ROOT/}"
 done
 
+TEMP_ROOT="$(mktemp -d)"
+TEMP_TARGET="$TEMP_ROOT/missing/flashDB_rust"
+"$SKILL/scripts/install_target_harness.sh" "$TEMP_TARGET" >/dev/null
+[ -s "$TEMP_TARGET/Cargo.toml" ] || fail "cold install did not create Cargo.toml"
+[ -s "$TEMP_TARGET/.cargo/config.toml" ] || fail "cold install did not create Cargo config"
+[ -s "$TEMP_TARGET/harness/project-adapter.json" ] || fail "cold install did not create harness"
+if find "$TEMP_TARGET/harness" \( -type d -name __pycache__ -o -type f -name '*.pyc' \) -print -quit | grep -q .; then
+  fail "cold install copied generated Python cache"
+fi
+printf 'preserve-source\n' > "$TEMP_TARGET/src/lib.rs"
+printf '\n# preserve-manifest\n' >> "$TEMP_TARGET/Cargo.toml"
+"$SKILL/scripts/install_target_harness.sh" "$TEMP_TARGET" >/dev/null
+grep -q 'preserve-source' "$TEMP_TARGET/src/lib.rs" || fail "reinstall overwrote Rust source"
+grep -q 'preserve-manifest' "$TEMP_TARGET/Cargo.toml" || fail "reinstall overwrote Cargo.toml"
+
 python3 -m py_compile "$HARNESS"/*.py
 python3 "$SKILL/tests/trace_capture_test.py"
+python3 "$SKILL/tests/general_method_test.py"
 rm -rf "$HARNESS/__pycache__" "$SKILL/tests/__pycache__"
-
-"${CC:-cc}" -fsyntax-only -Wall -Wextra \
-  -I"$ROOT/code/FlashDB/tests" -I"$ROOT/code/FlashDB/inc" -I"$ROOT/code/FlashDB/src" \
-  "$HARNESS/interop/interop_driver.c"
 
 python3 - "$ROOT" "$manifest" <<'PY'
 import hashlib
@@ -163,12 +221,19 @@ PY
 
 final_text="$(cat "$HARNESS/final_verify.sh")"
 for needle in \
-  "source_guard.py" "preflight.sh" "test_all.sh" "c_link_test.sh" \
-  "c_interop_test.sh" "c_coverage_check.py" "api_surface_check.py" \
-  "trace_capture.py verify" "translation_spec_check.py" \
-  "checkpoint.py verify-final" "rust_policy_check.py"
+  "source_guard.py" "preflight.sh" "project_discovery.py" \
+  "final_gate_runner.py" "checkpoint.py seal-final" "final_report.py"
 do
   assert_contains "$final_text" "$needle"
+done
+trusted_text="$(cat "$SKILL/scripts/final_verify_target.sh")"
+for needle in \
+  "install_target_harness.sh" \
+  "final_verify.sh" "completion.py stage" "trace_capture.py\" export" \
+  "trace_capture.py\" verify" "completion.py finalize" \
+  "trace_capture.py refresh-result" "completion.py verify --require-trace"
+do
+  assert_contains "$trusted_text" "$needle"
 done
 if grep -Rq "RUSTC_BOOTSTRAP" "$HARNESS"; then
   fail "fixed harness must not depend on RUSTC_BOOTSTRAP"

@@ -1,0 +1,220 @@
+{
+  "schema": "source-translation-adapter-v2",
+  "source_root": "../FlashDB",
+  "target_artifact": "target/release/libflashdb_rust.a",
+  "target_rlib": "target/release/libflashdb_rust.rlib",
+  "rust_crate_name": "flashdb_rust",
+  "source_hash_globs": [
+    "tests/**/Makefile",
+    "inc/**/*.h",
+    "src/**/*.c",
+    "src/**/*.h",
+    "tests/**/*.c",
+    "tests/**/*.h"
+  ],
+  "target_hash_globs": [
+    "Cargo.toml",
+    "Cargo.lock",
+    "build.rs",
+    ".cargo/config.toml",
+    "src/**/*.rs",
+    "tests/**/*.rs",
+    "harness/**/*.py",
+    "harness/**/*.sh",
+    "harness/**/*.json",
+    "harness/**/*.c"
+  ],
+  "build_command": ["cargo", "build", "--release"],
+  "source_native_build_command": ["python3", "harness/build_artifact_check.py"],
+  "build_validation_commands": [
+    {"command": ["cargo", "fmt", "--check"], "optional_tool": "rustfmt"},
+    {"command": ["cargo", "check", "--all-targets"]}
+  ],
+  "abi_ir_command": ["cargo", "rustc", "--release", "--lib", "--", "--emit=llvm-ir"],
+  "abi_unique_metadata": true,
+  "target_test_command": ["cargo", "test", "--release", "--all-targets", "--", "--nocapture"],
+  "runtime_timeout_seconds": 180,
+  "required_tools": ["python3", "cargo", "rustc", "cc", "clang", "make"],
+  "minimum_free_kib": 102400,
+  "source_probe": "src/fdb.c",
+  "source_oracle_build_commands": [
+    ["make", "-C", "{source}/tests", "clean"],
+    ["make", "-C", "{source}/tests", "all"]
+  ],
+  "test_discovery_patterns": {
+    ".c": "\\bTEST_RUN\\s*\\(\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*\\)",
+    ".cc": "\\bTEST_RUN\\s*\\(\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*\\)",
+    ".cpp": "\\bTEST_RUN\\s*\\(\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*\\)",
+    ".rs": "#\\s*\\[\\s*test\\s*\\][\\s\\S]{0,200}?\\bfn\\s+([A-Za-z_][A-Za-z0-9_]*)",
+    ".py": "(?m)^\\s*def\\s+(test_[A-Za-z0-9_]+)\\s*\\(",
+    ".js": "\\b(?:it|test)\\s*\\(\\s*['\\\"]([^'\\\"]+)",
+    ".ts": "\\b(?:it|test)\\s*\\(\\s*['\\\"]([^'\\\"]+)"
+  },
+  "native_test_protocol": {
+    "case_regex": "\\bTEST_RUN\\s*\\(\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*\\)",
+    "start_regex": "\\bRunning:\\s*([A-Za-z_][A-Za-z0-9_]*)",
+    "failure_regex": "\\bFAIL\\s+([A-Za-z_][A-Za-z0-9_]*):\\s*(.*)",
+    "fatal_regex": "panic|fatal runtime error|segmentation fault|abort"
+  },
+  "native_suites": [
+    {
+      "name": "kvdb",
+      "source_file": "tests/fdb_kvdb_tc.c",
+      "working_directory": "tests",
+      "cleanup_globs": ["fdb_kvdb1", "fdb_tsdb1", "storage_*", "storage_tsdb"],
+      "prepare_commands": [
+        ["{cc}", "-c", "kvdb_main.c", "-I.", "-I../inc", "-I../src", "-o", "kvdb_main.o"],
+        ["{cc}", "-o", "kvdb_test", "kvdb_main.o", "{artifact}", "-lpthread", "-ldl", "-lm"]
+      ],
+      "run_command": ["./kvdb_test"],
+      "pass_regex": "===\\s*KVDB Test:\\s*PASSED\\s*==="
+    },
+    {
+      "name": "tsdb",
+      "source_file": "tests/fdb_tsdb_tc.c",
+      "working_directory": "tests",
+      "cleanup_globs": ["fdb_kvdb1", "fdb_tsdb1", "storage_*", "storage_tsdb"],
+      "prepare_commands": [
+        ["{cc}", "-c", "tsdb_main.c", "-I.", "-I../inc", "-I../src", "-o", "tsdb_main.o"],
+        ["{cc}", "-o", "tsdb_test", "tsdb_main.o", "{artifact}", "-lpthread", "-ldl", "-lm"]
+      ],
+      "run_command": ["./tsdb_test"],
+      "pass_regex": "===\\s*TSDB Test:\\s*PASSED\\s*==="
+    }
+  ],
+  "public_header": "inc/flashdb.h",
+  "definitions_header": "inc/fdb_def.h",
+  "public_function_regex": "\\b(fdb_[A-Za-z0-9_]+)\\s*\\(",
+  "control_regex": "(?m)^\\s*#define\\s+(FDB_(?:KVDB|TSDB)_CTRL_[A-Z0-9_]+)\\b",
+  "control_value_regex": "(?m)^\\s*#define\\s+(FDB_(?:KVDB|TSDB)_CTRL_[A-Z0-9_]+)\\s+([^\\s/]+)",
+  "api_runtime_sources": [
+    {"root": "source", "path": "tests/kvdb_main.c"},
+    {"root": "source", "path": "tests/tsdb_main.c"}
+  ],
+  "layout_contracts": [
+    {
+      "c_type": "struct fdb_blob",
+      "rust_type": "flashdb_rust::ffi::CFlashdbBlob",
+      "fields": {
+        "buf": "buf",
+        "size": "size",
+        "saved.meta_addr": "saved_meta_addr",
+        "saved.addr": "saved_addr",
+        "saved.len": "saved_len"
+      }
+    },
+    {
+      "c_type": "struct fdb_kv",
+      "rust_type": "flashdb_rust::ffi::CFlashdbKv",
+      "fields": {
+        "status": "status",
+        "crc_is_ok": "crc_is_ok",
+        "name_len": "name_len",
+        "magic": "magic",
+        "len": "len",
+        "value_len": "value_len",
+        "name": "name",
+        "addr.start": "addr_start",
+        "addr.value": "addr_value"
+      }
+    },
+    {
+      "c_type": "struct fdb_kv_iterator",
+      "rust_type": "flashdb_rust::ffi::CFlashdbKvIterator",
+      "fields": {
+        "curr_kv": "curr_kv",
+        "iterated_cnt": "iterated_cnt",
+        "iterated_obj_bytes": "iterated_obj_bytes",
+        "iterated_value_bytes": "iterated_value_bytes",
+        "sector_addr": "sector_addr",
+        "traversed_len": "traversed_len"
+      }
+    },
+    {
+      "c_type": "struct fdb_tsl",
+      "rust_type": "flashdb_rust::ffi::CFlashdbTsl",
+      "fields": {
+        "status": "status",
+        "time": "time",
+        "log_len": "log_len",
+        "addr.index": "addr_index",
+        "addr.log": "addr_log"
+      }
+    }
+  ],
+  "differential_source_repetitions": 2,
+  "differential_ignore_globs": [],
+  "c_compile_flags": ["-I{source}/inc", "-I{source}/src", "-I{source}/tests"],
+  "c_link_flags": ["-lpthread", "-ldl", "-lm"],
+  "capabilities": {
+    "public_c_abi": true,
+    "layout_contract": true,
+    "source_native_tests": true,
+    "source_target_differential": true,
+    "callbacks": true
+  },
+  "configuration_profile": {
+    "source_file": "tests/fdb_cfg.h",
+    "description": [
+      "Backend: POSIX file mode",
+      "Databases: KVDB and TSDB",
+      "Write granularity: 1 bit",
+      "Timestamp: signed 32 bit"
+    ],
+    "required_regex": {
+      "FDB_USING_KVDB": "(?m)^\\s*#define\\s+FDB_USING_KVDB\\b",
+      "FDB_USING_TSDB": "(?m)^\\s*#define\\s+FDB_USING_TSDB\\b",
+      "FDB_USING_FILE_POSIX_MODE": "(?m)^\\s*#define\\s+FDB_USING_FILE_POSIX_MODE\\b",
+      "FDB_WRITE_GRAN=1": "(?m)^\\s*#define\\s+FDB_WRITE_GRAN\\s+1\\s*$"
+    },
+    "forbidden_regex": {
+      "FDB_USING_TIMESTAMP_64BIT": "(?m)^\\s*#define\\s+FDB_USING_TIMESTAMP_64BIT\\b"
+    }
+  },
+  "applicable_contracts": [
+    "BASE-01", "PROF-01", "IMM-01", "COV-01", "API-01", "TDD-01",
+    "INT-01", "LAY-01", "STA-01", "PST-01", "XIO-01", "ABI-01",
+    "MEM-01", "ERR-01", "CBK-01", "GLB-01", "EVD-01", "LOG-01", "VER-01"
+  ],
+  "required_evidence": {
+    "final-build": ["./harness/build_check.sh"],
+    "final-source": ["python3", "harness/source_guard.py", "--target", "."],
+    "final-profile": ["python3", "harness/config_profile_check.py"],
+    "final-source-oracle": ["python3", "harness/source_oracle_runner.py"],
+    "final-target-tests": ["./harness/test_all.sh"],
+    "final-c-link": ["./harness/c_link_test.sh"],
+    "final-differential": ["python3", "harness/differential_compare.py"],
+    "final-c-coverage": ["python3", "harness/c_coverage_check.py"],
+    "final-api": ["python3", "harness/api_surface_check.py"],
+    "final-rust-policy": ["python3", "harness/rust_policy_check.py"],
+    "final-spec": ["python3", "harness/translation_spec_check.py"]
+  },
+  "required_trace_reports": [
+    "checkpoint.json",
+    "tool-versions.json",
+    "build-artifacts.json",
+    "project-profile.json",
+    "source-inventory.md",
+    "layout-probe.md",
+    "source-acceptance.json",
+    "source-oracle.json",
+    "differential-report.md",
+    "source-test-coverage.tsv",
+    "c-api-coverage.tsv",
+    "c-to-rust-compliance.tsv",
+    "c-module-coverage.tsv",
+    "config-profile.md",
+    "final-report.md"
+  ],
+  "required_trace_artifact_globs": [
+    "reports/source-acceptance-logs/*.log",
+    "reports/source-oracle-logs/*.log",
+    "reports/runtime-snapshots/**/*.json",
+    "reports/abi-probe/*.c",
+    "reports/abi-probe/*.rs",
+    "reports/abi-probe/*.ll",
+    "reports/abi-probe/*.log",
+    "reports/abi-probe/*.json"
+  ],
+  "trace_provider": "opencode"
+}

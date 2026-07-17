@@ -4,5 +4,4 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-echo "[test_all] cargo test --release --all-targets -- --nocapture"
-cargo test --release --all-targets -- --nocapture
+python3 ./harness/target_test_runner.py

@@ -18,32 +18,12 @@ require_files "Rust test" tests
 
 python3 ./harness/source_guard.py --target "$ROOT"
 ./harness/preflight.sh
-./harness/build_check.sh
-./harness/test_all.sh
-./harness/c_link_test.sh
-./harness/c_interop_test.sh
-python3 ./harness/c_coverage_check.py
-python3 ./harness/api_surface_check.py
-python3 ./harness/trace_capture.py verify --target "$ROOT"
-python3 ./harness/translation_spec_check.py
-python3 ./harness/checkpoint.py verify-final
-python3 ./harness/rust_policy_check.py
-python3 ./harness/source_guard.py --target "$ROOT"
+python3 ./harness/project_discovery.py --target "$ROOT"
+python3 ./harness/checkpoint.py init
+python3 ./harness/final_gate_runner.py
 
-mkdir -p reports
-{
-  echo "# Final Verification Report"
-  echo
-  echo "- Status: PASSED"
-  echo "- Command: ./harness/final_verify.sh"
-  echo "- Configuration: POSIX file mode, KVDB+TSDB, FDB_WRITE_GRAN=1, 32-bit timestamp"
-  echo "- Rust static library: target/release/libflashdb_rust.a"
-  echo "- C linked tests: PASSED"
-  echo "- C/Rust bidirectional persistence: PASSED"
-  echo "- Public C API surface: PASSED"
-  echo "- C-to-Rust specification: PASSED"
-  echo "- Rust safety policy: PASSED"
-  echo "- Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-} > reports/final-report.md
+python3 ./harness/checkpoint.py seal-final
+python3 ./harness/final_report.py
+python3 ./harness/source_guard.py --target "$ROOT"
 
 echo "FINAL_VERIFY_PASS"

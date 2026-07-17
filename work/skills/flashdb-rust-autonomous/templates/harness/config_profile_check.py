@@ -5,37 +5,48 @@ import pathlib
 import re
 import sys
 
-TARGET = pathlib.Path.cwd()
-CONFIG = (TARGET / "../FlashDB/tests/fdb_cfg.h").resolve()
+from adapter import load_adapter, source_root
+
+
+TARGET = pathlib.Path.cwd().resolve()
+ADAPTER = load_adapter(TARGET)
+SOURCE = source_root(TARGET, ADAPTER)
 REPORT = TARGET / "reports/config-profile.md"
 
 
 def main() -> int:
-    if not CONFIG.is_file():
-        print(f"CONFIG_PROFILE_FAIL: missing {CONFIG}", file=sys.stderr)
-        return 1
-    text = re.sub(r"/\*.*?\*/", "", CONFIG.read_text(errors="replace"), flags=re.S)
-    required = {
-        "FDB_USING_KVDB": r"(?m)^\s*#define\s+FDB_USING_KVDB\b",
-        "FDB_USING_TSDB": r"(?m)^\s*#define\s+FDB_USING_TSDB\b",
-        "FDB_USING_FILE_POSIX_MODE": r"(?m)^\s*#define\s+FDB_USING_FILE_POSIX_MODE\b",
-        "FDB_WRITE_GRAN=1": r"(?m)^\s*#define\s+FDB_WRITE_GRAN\s+1\s*$",
-    }
-    failures = [name for name, pattern in required.items() if not re.search(pattern, text)]
-    if re.search(r"(?m)^\s*#define\s+FDB_USING_TIMESTAMP_64BIT\b", text):
-        failures.append("FDB_USING_TIMESTAMP_64BIT must be disabled for the fixed profile")
-
+    profile = ADAPTER.get("configuration_profile")
+    if not isinstance(profile, dict):
+        raise ValueError("adapter configuration_profile is missing")
+    config = SOURCE / str(profile.get("source_file", ""))
+    if not config.is_file():
+        raise ValueError(f"configuration source is missing: {config}")
+    text = re.sub(r"/\*.*?\*/", "", config.read_text(errors="replace"), flags=re.S)
+    required = profile.get("required_regex")
+    forbidden = profile.get("forbidden_regex")
+    if not isinstance(required, dict) or not isinstance(forbidden, dict):
+        raise ValueError("configuration profile regex maps are invalid")
+    failures = [
+        f"required setting is absent: {name}"
+        for name, pattern in required.items()
+        if not isinstance(pattern, str) or not re.search(pattern, text)
+    ]
+    failures.extend(
+        f"forbidden setting is enabled: {name}"
+        for name, pattern in forbidden.items()
+        if isinstance(pattern, str) and re.search(pattern, text)
+    )
+    description = profile.get("description")
+    if not isinstance(description, list) or not all(isinstance(item, str) for item in description):
+        raise ValueError("configuration profile description is invalid")
     REPORT.parent.mkdir(parents=True, exist_ok=True)
     REPORT.write_text(
         "\n".join(
             [
                 "# Supported Configuration Profile",
                 "",
-                "- Backend: POSIX file mode",
-                "- Databases: KVDB and TSDB",
-                "- Write granularity: 1 bit",
-                "- Timestamp: signed 32 bit",
-                "- Scope: the profile selected by code/FlashDB/tests/fdb_cfg.h",
+                *(f"- {item}" for item in description),
+                f"- Scope: {config.relative_to(SOURCE)}",
                 f"- Status: {'FAILED' if failures else 'PASSED'}",
                 "",
                 *(f"- Failure: {failure}" for failure in failures),
@@ -44,13 +55,16 @@ def main() -> int:
         )
     )
     if failures:
-        print("CONFIG_PROFILE_FAIL", file=sys.stderr)
         for failure in failures:
-            print(f"- {failure}", file=sys.stderr)
+            print(f"CONFIG_PROFILE_FAIL: {failure}", file=sys.stderr)
         return 1
     print("CONFIG_PROFILE_PASS")
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except (OSError, ValueError) as exc:
+        print(f"CONFIG_PROFILE_FAIL: {exc}", file=sys.stderr)
+        sys.exit(1)

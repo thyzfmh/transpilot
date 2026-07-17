@@ -6,8 +6,10 @@ import hashlib
 import pathlib
 import sys
 
+from adapter import load_adapter, source_root
+from run_identity import matched_files
+
 SKILL_REL = pathlib.Path("work/skills/flashdb-rust-autonomous")
-SOURCE_PATTERNS = ("*.c", "*.h", "Makefile")
 
 
 def sha256(path: pathlib.Path) -> str:
@@ -42,14 +44,16 @@ def read_manifest(path: pathlib.Path) -> dict[str, str]:
     return entries
 
 
-def source_files(repo: pathlib.Path) -> set[str]:
-    result: set[str] = set()
-    for root in [repo / "code/FlashDB/inc", repo / "code/FlashDB/src", repo / "code/FlashDB/tests"]:
-        if not root.is_dir():
-            continue
-        for pattern in SOURCE_PATTERNS:
-            result.update(path.relative_to(repo).as_posix() for path in root.rglob(pattern) if path.is_file())
-    return result
+def source_files(repo: pathlib.Path, target: pathlib.Path) -> set[str]:
+    adapter = load_adapter(target)
+    source = source_root(target, adapter)
+    patterns = adapter.get("source_hash_globs")
+    if not isinstance(patterns, list):
+        raise ValueError("adapter source_hash_globs is missing")
+    return {
+        path.relative_to(repo).as_posix()
+        for path in matched_files(source, patterns)
+    }
 
 
 def harness_files(root: pathlib.Path) -> dict[str, pathlib.Path]:
@@ -69,7 +73,7 @@ def verify(target: pathlib.Path) -> int:
     skill = repo / SKILL_REL
     manifest_path = skill / "references/source-manifest.sha256"
     expected = read_manifest(manifest_path)
-    actual_files = source_files(repo)
+    actual_files = source_files(repo, target)
     failures: list[str] = []
 
     missing = sorted(set(expected) - actual_files)
@@ -101,7 +105,7 @@ def verify(target: pathlib.Path) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--target", default="code/flashDB_rust")
+    parser.add_argument("--target", default=".")
     args = parser.parse_args()
     return verify(pathlib.Path(args.target).resolve())
 
